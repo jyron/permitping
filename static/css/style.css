@@ -155,3 +155,35 @@ footer.site { border-top: 1px solid var(--border); margin-top: 48px; padding: 24
   .detail-grid { grid-template-columns: 1fr; }
   header.site nav a { margin-left: 12px; }
 }
+
+/* Address autocomplete */
+.combo { position: relative; }
+.combo input { margin-bottom: 4px; }
+.combo ul {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.combo li { padding: 10px 12px; border-radius: var(--radius); cursor: pointer; }
+.combo li:hover, .combo li.active { background: var(--accent); color: #fff; }
+.combo li:hover .suggestion-city, .combo li.active .suggestion-city { color: #fff; opacity: .8; }
+.suggestion-city { color: var(--muted); font-size: .85rem; margin-left: 6px; }
+.combo-hint { font-size: .85rem; margin: 8px 0 0; }
+.alt-lookup { margin-top: 0; }
+
+.permit-row { border-top: 1px solid var(--border); padding: 14px 0; }
+.permit-row:last-child { padding-bottom: 0; }
+.permit-row-main { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.permit-row .result-meta { margin: 0 0 10px; }
+.permit-row .btn { padding: 8px 14px; font-size: .9rem; }

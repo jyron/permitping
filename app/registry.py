@@ -58,6 +58,7 @@ JURISDICTIONS = [
         "permit_example": "BP261596",
         "freshness": "Official city data feed",
         "adapter": "arcgis",
+        "address_search": [{"full": "OriginalAddress1"}],
         "source": {
             "query_url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0/query",
             "fields": {
@@ -99,6 +100,7 @@ JURISDICTIONS = [
         "permit_example": "26008790",
         "freshness": "Official city GIS feed (covers roughly the last 2 years; newest SHAPE PHX CTR- permits not yet included)",
         "adapter": "arcgis",
+        "address_search": [{"full": "STREET_FULL_NAME"}],
         "source": {
             "query_url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query",
             "fields": {
@@ -144,6 +146,10 @@ JURISDICTIONS = [
         "permit_example": "B00354263-I1",
         "freshness": "Official NYC open data, updated daily per NYC DOB",
         "adapter": "socrata",
+        "address_search": [
+            {"dataset_index": 0, "house": "house_no", "street": "street_name"},
+            {"dataset_index": 1, "house": "house__", "street": "street_name"},
+        ],
         "source": {
             "attribution": "NYC Open Data (Department of Buildings)",
             "datasets": [
@@ -182,6 +188,9 @@ JURISDICTIONS = [
         "permit_example": "B200477893",
         "freshness": "Official city open data, updated daily per city data portal",
         "adapter": "socrata",
+        "address_search": [
+            {"dataset_index": 0, "house": "street_number", "street": "street_name"},
+        ],
         "source": {
             "attribution": "Chicago Data Portal (Department of Buildings)",
             "datasets": [
@@ -211,6 +220,13 @@ JURISDICTIONS = [
         "permit_example": "26016-90000-18307",
         "freshness": "Official city open data (LADBS)",
         "adapter": "socrata",
+        # suggest from building-issued only; on selection the sibling LADBS
+        # datasets (same schema) are queried too and merged into one list
+        "address_search": [
+            {"dataset_index": 0, "full": "primary_address"},
+            *({"dataset_index": i, "full": "primary_address", "suggest": False}
+              for i in range(1, 6)),
+        ],
         "source": {
             "attribution": "Los Angeles Open Data (LADBS)",
             # issued first (later lifecycle state wins), then submitted

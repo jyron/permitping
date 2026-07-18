@@ -3,9 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Permit Ping | Know when your permit moves</title>
-<meta name="description" content="Check any supported building permit in seconds, free. Permit Ping monitors the official municipal record daily and emails you when the status changes.">
+<title>Building Permit Status Lookup by Address or Permit Number | Permit Ping</title>
+<meta name="description" content="Type a street address or permit number and get the permit's current status straight from the official city record. Free, instant, no account. Covers Chicago, New York, Los Angeles, Phoenix, and more.">
+<link rel="canonical" href="https://permitstatus.hndshake.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Permit Ping">
+<meta property="og:title" content="Building Permit Status Lookup by Address or Permit Number">
+<meta property="og:description" content="Type a street address and get every permit on file for it, straight from the official city record. Free and instant.">
+<meta property="og:url" content="https://permitstatus.hndshake.com/">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="/static/css/style.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"Permit Ping","url":"https://permitstatus.hndshake.com/","description":"Building permit status lookup by street address or permit number, from official municipal records."}
+</script>
 </head>
 <body>
 <header class="site">
@@ -21,11 +31,24 @@
 
 <main class="wrap">
   <div class="hero">
-    <h1>Know when your permit moves.</h1>
-    <p class="sub">Check any supported permit in seconds, free. Get an email whenever its official status changes.</p>
+    <h1>Check any building permit's status.</h1>
+    <p class="sub">Type a street address and see every permit on file for it — or look one up by permit number. Straight from the official city record, free.</p>
   </div>
 
   <div class="card">
+    <label for="address-input">Street address</label>
+    <div class="combo">
+      <input id="address-input" placeholder="Start typing an address — e.g. 1060 W Addison" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="address-suggestions" aria-autocomplete="list">
+      <ul id="address-suggestions" role="listbox" hidden></ul>
+    </div>
+    <p class="muted combo-hint" id="address-hint">Address search covers Chicago, New York, Los Angeles, Phoenix, and Tempe so far — more cities on the way.</p>
+    <div id="address-error"></div>
+  </div>
+
+  <div id="address-permits"></div>
+
+  <div class="card">
+    <h3 class="alt-lookup">Know the permit number?</h3>
     <form id="lookup-form">
       <label for="location">City or ZIP code</label>
       <input id="location" placeholder="Mesa or 85201" required autocomplete="off">

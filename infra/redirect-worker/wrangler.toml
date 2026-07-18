@@ -1,0 +1,8 @@
+name = "hndshake-redirect"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+routes = [
+  { pattern = "hndshake.com/*", zone_name = "hndshake.com" },
+  { pattern = "www.hndshake.com/*", zone_name = "hndshake.com" },
+]
