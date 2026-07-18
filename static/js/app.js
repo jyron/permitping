@@ -47,15 +47,15 @@ function renderResult(record) {
     : `${Math.round(retrieved / 60)} minutes ago`;
   $("result").innerHTML = `
     <div class="card">
-      <p class="muted" style="margin-top:0">Permit found — ${esc(record.jurisdiction_name)}</p>
+      <p class="muted" style="margin-top:0">Permit found: ${esc(record.jurisdiction_name)}</p>
       <p class="permit-number">${esc(record.permit_number)}</p>
       <p class="result-meta">${esc(record.address)}<br>${esc(record.description)}</p>
       <span class="status-badge ${statusClass(record.status)}">${esc(record.status)}</span>
       <div class="detail-grid">
-        <div><b>Status date</b>${esc(record.status_date || "—")}</div>
+        <div><b>Status date</b>${esc(record.status_date || "n/a")}</div>
         <div><b>Jurisdiction</b>${esc(record.jurisdiction_name)}</div>
         <div><b>Source</b>${esc(d.source || "official municipal record")}</div>
-        <div><b>Data freshness</b>${esc(d.freshness || "—")}</div>
+        <div><b>Data freshness</b>${esc(d.freshness || "n/a")}</div>
       </div>
       <a class="btn secondary" href="${esc(record.portal_url)}" rel="nofollow">View official record</a>
       <p class="retrieved">Retrieved from the official source ${retrievedText}.</p>

@@ -86,7 +86,7 @@ async function loadAccount() {
   $("account-section").style.display = "";
   const limit = account.monitor_limit === null ? "unlimited" : account.monitor_limit;
   $("account-sub").textContent =
-    `${account.email} — ${account.plan} plan, ${account.active_monitors} of ${limit} active permits`;
+    `${account.email}: ${account.plan} plan, ${account.active_monitors} of ${limit} active permits`;
   $("new-email").value = account.email;
   $("monitor-rows").innerHTML = account.monitors.length
     ? account.monitors.map(monitorRow).join("")
@@ -122,7 +122,7 @@ $("monitor-rows")?.addEventListener("click", async (e) => {
       const events = await api(`/api/monitors/${id}/events`);
       slot.innerHTML = events.length
         ? `<ul class="history">${events
-            .map((ev) => `<li>${new Date(ev.changed_at).toLocaleString()} — ${esc(ev.previous_status || "(start)")} → <b>${esc(ev.new_status)}</b></li>`)
+            .map((ev) => `<li>${new Date(ev.changed_at).toLocaleString()}: ${esc(ev.previous_status || "(start)")} → <b>${esc(ev.new_status)}</b></li>`)
             .join("")}</ul>`
         : `<p class="muted">No status changes recorded yet.</p>`;
       btn.disabled = false;

@@ -73,7 +73,7 @@ class AcaGlobalSearchAdapter(CityAdapter):
         i = page.find("Project Description")
         if i >= 0:
             parts = _strip(page[i : i + 3000]).split("|")
-            description = " — ".join(parts[1:3]) if len(parts) > 2 else "|".join(parts[1:2])
+            description = " - ".join(parts[1:3]) if len(parts) > 2 else "|".join(parts[1:2])
 
         return PermitRecord(
             permit_number=_span(page, "ctl00_PlaceHolderMain_lblPermitNumber") or permit_number,
@@ -82,7 +82,7 @@ class AcaGlobalSearchAdapter(CityAdapter):
             status=status,
             address=address,
             description=(
-                f"{_span(page, 'ctl00_PlaceHolderMain_lblPermitType')} — {description}"
+                f"{_span(page, 'ctl00_PlaceHolderMain_lblPermitType')} - {description}"
                 if description
                 else _span(page, "ctl00_PlaceHolderMain_lblPermitType")
             ),
@@ -172,7 +172,7 @@ class AcaViewstateAdapter(CityAdapter):
             jurisdiction_name=self.jurisdiction["name"],
             status=status,
             address=address,
-            description=f"{record_type} — {project_name}" if project_name else record_type,
+            description=f"{record_type} - {project_name}" if project_name else record_type,
             status_date=date,
             portal_url=portal_url,
             details={"source": "live official portal (Accela Citizen Access)"},

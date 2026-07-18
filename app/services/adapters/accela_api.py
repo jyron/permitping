@@ -105,7 +105,7 @@ class AccelaConstructAdapter(CityAdapter):
             if isinstance(status, dict)
             else str(status),
             address=address,
-            description=f"{type_text} — {description}" if type_text and description else (type_text or description),
+            description=f"{type_text} - {description}" if type_text and description else (type_text or description),
             status_date=status_date,
             portal_url=self.jurisdiction["portal_url"],
             details={"source": "official Accela records API"},
