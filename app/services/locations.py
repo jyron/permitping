@@ -20,13 +20,18 @@ def resolve(text: str) -> dict:
 
     if re.fullmatch(r"\d{5}", cleaned):
         for j in JURISDICTIONS:
-            if cleaned in j.get("zips", ()) or (
-                "zip_prefix" in j and cleaned.startswith(j["zip_prefix"])
+            if cleaned in j.get("zips", ()) or any(
+                cleaned.startswith(p) for p in j.get("zip_prefixes", ())
             ):
                 return j
         raise UnsupportedLocation(text)
 
+    city_part = cleaned.split(",")[0].strip()
     for j in JURISDICTIONS:
-        if cleaned == j["slug"] or cleaned.split(",")[0].strip() == j["city"].lower():
+        if (
+            cleaned == j["slug"]
+            or city_part == j["city"].lower()
+            or city_part in j.get("aliases", ())
+        ):
             return j
     raise UnsupportedLocation(text)

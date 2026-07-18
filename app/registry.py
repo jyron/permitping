@@ -3,7 +3,7 @@
 Each entry declares:
 - source_class: "feed" (bulk-syncable dataset -> local permit store) or
   "portal" (interactive lookup only, one permit per request)
-- zips / zip_prefix: for resolving a user-entered ZIP code to the city
+- zips / zip_prefixes: for resolving a user-entered ZIP code to the city
 - adapter + source: how to fetch from the city's system
 
 Onboarding a city means adding one entry here. Nothing else changes.
@@ -14,6 +14,7 @@ from app.services.adapters.aca import AcaGlobalSearchAdapter, AcaViewstateAdapte
 from app.services.adapters.accela_api import AccelaConstructAdapter
 from app.services.adapters.arcgis import ArcGISAdapter
 from app.services.adapters.base import AdapterUnavailable, CityAdapter
+from app.services.adapters.socrata import SocrataAdapter
 
 JURISDICTIONS = [
     {
@@ -82,7 +83,7 @@ JURISDICTIONS = [
         "city": "Phoenix",
         "state": "AZ",
         "source_class": "feed",
-        "zip_prefix": "850",
+        "zip_prefixes": ["850"],
         "portal_name": "Phoenix PDD Online Permit Search",
         "portal_url": "https://apps-secure.phoenix.gov/PDD/Search/Permits",
         "permit_example": "26008790",
@@ -101,6 +102,122 @@ JURISDICTIONS = [
             "attribution": "City of Phoenix GIS",
         },
     },
+    {
+        "slug": "goodyear-az",
+        "name": "Goodyear, Arizona",
+        "city": "Goodyear",
+        "state": "AZ",
+        "source_class": "portal",
+        "zips": ["85338", "85395"],
+        "portal_name": "Goodyear Services Portal (Accela)",
+        "portal_url": "https://aca-prod.accela.com/GOODYEAR/",
+        "permit_example": "B26-01594",
+        "freshness": "Live official portal, real-time",
+        "adapter": "aca_global",
+        "source": {
+            "base_url": "https://aca-prod.accela.com/GOODYEAR",
+            "agency": "GOODYEAR",
+        },
+    },
+    {
+        "slug": "new-york-ny",
+        "name": "New York City, New York",
+        "city": "New York",
+        "state": "NY",
+        "aliases": ["nyc", "new york city", "manhattan", "brooklyn", "queens",
+                    "bronx", "the bronx", "staten island"],
+        "source_class": "portal",
+        "zip_prefixes": ["100", "101", "102", "103", "104", "111", "112",
+                         "113", "114", "116"],
+        "portal_name": "NYC Department of Buildings (DOB NOW / BIS)",
+        "portal_url": "https://a810-dobnow.nyc.gov/publish/Index.html",
+        "permit_example": "B00354263-I1",
+        "freshness": "Official NYC open data, refreshed about daily",
+        "adapter": "socrata",
+        "source": {
+            "attribution": "NYC Open Data (Department of Buildings)",
+            "datasets": [
+                {
+                    "query_url": "https://data.cityofnewyork.us/resource/rbx6-tga4.json",
+                    "fields": {
+                        "permit_number": "job_filing_number",
+                        "status": "permit_status",
+                        "address": ["house_no", "street_name", "borough"],
+                        "description": "job_description",
+                        "date": "issued_date",
+                    },
+                },
+                {
+                    "query_url": "https://data.cityofnewyork.us/resource/ipu4-2q9a.json",
+                    "fields": {
+                        "permit_number": "job__",
+                        "status": "permit_status",
+                        "address": ["house__", "street_name", "borough"],
+                        "description": "job_type",
+                        "date": "issuance_date",
+                    },
+                },
+            ],
+        },
+    },
+    {
+        "slug": "chicago-il",
+        "name": "Chicago, Illinois",
+        "city": "Chicago",
+        "state": "IL",
+        "source_class": "portal",
+        "zip_prefixes": ["606"],
+        "portal_name": "Chicago Building Permits (city data portal)",
+        "portal_url": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu",
+        "permit_example": "B200477893",
+        "freshness": "Official city open data, refreshed about daily",
+        "adapter": "socrata",
+        "source": {
+            "attribution": "Chicago Data Portal (Department of Buildings)",
+            "datasets": [
+                {
+                    "query_url": "https://data.cityofchicago.org/resource/ydr8-5enu.json",
+                    "fields": {
+                        "permit_number": "permit_",
+                        "status": "permit_status",
+                        "address": ["street_number", "street_direction", "street_name"],
+                        "description": "work_description",
+                        "date": "issue_date",
+                    },
+                },
+            ],
+        },
+    },
+    {
+        "slug": "los-angeles-ca",
+        "name": "Los Angeles, California",
+        "city": "Los Angeles",
+        "state": "CA",
+        "aliases": ["la"],
+        "source_class": "portal",
+        "zip_prefixes": ["900", "901", "913", "914"],
+        "portal_name": "LADBS Online Permit Lookup",
+        "portal_url": "https://www.ladbs.org/services/check-status/online-permit-lookup",
+        "permit_example": "20010-20000-01442",
+        "freshness": "Official city open data (LADBS), refreshed about weekly",
+        "adapter": "socrata",
+        "source": {
+            "attribution": "Los Angeles Open Data (LADBS)",
+            "datasets": [
+                {
+                    "query_url": "https://data.lacity.org/resource/xnhu-aczu.json",
+                    "fields": {
+                        "permit_number": "pcis_permit",
+                        "status": "latest_status",
+                        "address": ["address_start", "street_direction",
+                                    "street_name", "street_suffix"],
+                        "description": "work_description",
+                        "date": "status_date",
+                    },
+                },
+            ],
+        },
+    },
 ]
 
 _BY_SLUG = {j["slug"]: j for j in JURISDICTIONS}
@@ -109,6 +226,7 @@ _ADAPTERS = {
     "aca_viewstate": AcaViewstateAdapter,
     "aca_global": AcaGlobalSearchAdapter,
     "arcgis": ArcGISAdapter,
+    "socrata": SocrataAdapter,
 }
 
 
