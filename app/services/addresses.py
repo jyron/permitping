@@ -115,29 +115,79 @@ async def _fetch_json(url: str, params: dict):
 
 # ---------------------------------------------------------------- suggest
 
+# Socrata portals sit behind a WAF that 403s SQL-looking $where clauses when
+# the caller is a datacenter IP (Railway) — the same query passes from a
+# residential connection. Precise $where is attempted first; on a 403 the
+# domain is remembered and queried with the WAF-safe $q full-text parameter
+# instead, with the precision recovered by filtering rows in Python.
+_blocked_domains: dict[str, float] = {}
+_BLOCKED_TTL = 3600
+
+
+def _domain_blocked(url: str) -> bool:
+    ts = _blocked_domains.get(httpx.URL(url).host)
+    return ts is not None and time.monotonic() - ts < _BLOCKED_TTL
+
+
 async def _suggest_socrata(jurisdiction, entry, norm_q, house, street):
     dataset = _entry_dataset(jurisdiction, entry)
     fields = dataset["fields"]
-    params = {"$limit": str(PER_SOURCE_ROWS)}
+    base = {"$limit": str(PER_SOURCE_ROWS)}
     if fields.get("date"):
-        params["$order"] = f"{fields['date']} DESC"
-    if entry.get("full"):
-        conditions = _full_column_conditions(
-            f"upper({entry['full']})", house, street
-        )
-        if not conditions:
-            return []
-        params["$where"] = " AND ".join(conditions)
-    else:
-        if not street:
-            return []
-        safe = street[0].replace("'", "''")
-        params["$where"] = f"upper({entry['street']}) like '{safe}%'"
+        base["$order"] = f"{fields['date']} DESC"
+    cols = _entry_columns(jurisdiction, entry)
+
+    if not _domain_blocked(dataset["query_url"]):
+        params = dict(base)
+        if entry.get("full"):
+            col = f"upper({entry['full']})"
+            conditions = [f"starts_with({col}, '{house} ')"] if house else []
+            conditions += [
+                f"contains({col}, '{t.replace(chr(39), chr(39) * 2)}')"
+                for t in street
+            ]
+            if not conditions:
+                return []
+            params["$where"] = " AND ".join(conditions)
+        else:
+            if not street:
+                return []
+            safe = street[0].replace("'", "''")
+            params["$where"] = f"starts_with(upper({entry['street']}), '{safe}')"
+            if house and entry.get("house"):
+                params[entry["house"]] = house
+        try:
+            rows = await _fetch_json(dataset["query_url"], params)
+            return [_row_suggestion(jurisdiction, entry, row, cols) for row in rows]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 403:
+                raise
+            _blocked_domains[httpx.URL(dataset["query_url"]).host] = time.monotonic()
+            logger.warning("WAF 403 from %s, falling back to $q", dataset["query_url"])
+
+    # $q matches complete words only. Try all tokens first (typed words are
+    # usually complete); if the last token was mid-word and nothing matched,
+    # retry without it and recover precision by filtering rows in Python.
+    tokens = ([house] if house else []) + street
+    if not tokens:
+        return []
+
+    async def q_attempt(q_tokens):
+        params = dict(base, **{"$q": " ".join(q_tokens)})
         if house and entry.get("house"):
             params[entry["house"]] = house
-    cols = _entry_columns(jurisdiction, entry)
-    rows = await _fetch_json(dataset["query_url"], params)
-    return [_row_suggestion(jurisdiction, entry, row, cols) for row in rows]
+        rows = await _fetch_json(dataset["query_url"], params)
+        suggestions = [_row_suggestion(jurisdiction, entry, r, cols) for r in rows]
+        return [
+            s for s in suggestions
+            if all(t in s["address"] for t in street)
+            and (not house or s["address"].startswith(f"{house} "))
+        ]
+
+    results = await q_attempt(tokens)
+    if not results and len(tokens) > 1:
+        results = await q_attempt(tokens[:-1])
+    return results
 
 
 def _full_column_conditions(col_expr: str, house, street) -> list[str]:
