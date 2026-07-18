@@ -16,6 +16,16 @@ from app.services.adapters.arcgis import ArcGISAdapter
 from app.services.adapters.base import AdapterUnavailable, CityAdapter
 from app.services.adapters.socrata import SocrataAdapter
 
+# LADBS "from 2020 to Present" datasets all share one schema; the same field
+# map serves building, electrical, and mechanical, issued and submitted.
+_LADBS_FIELDS = {
+    "permit_number": "permit_nbr",
+    "status": "status_desc",
+    "address": ["primary_address"],
+    "description": "work_desc",
+    "date": "status_date",
+}
+
 JURISDICTIONS = [
     {
         "slug": "mesa-az",
@@ -204,28 +214,24 @@ JURISDICTIONS = [
         "source": {
             "attribution": "Los Angeles Open Data (LADBS)",
             # issued first (later lifecycle state wins), then submitted
-            # (in-review permits), then the retired pre-2020 archive
+            # (in-review permits), then the retired pre-2020 archive.
+            # Covers building, electrical, and mechanical permits; LADBS
+            # publishes no separate plumbing dataset.
             "datasets": [
-                {
-                    "query_url": "https://data.lacity.org/resource/pi9x-tg5x.json",
-                    "fields": {
-                        "permit_number": "permit_nbr",
-                        "status": "status_desc",
-                        "address": ["primary_address"],
-                        "description": "work_desc",
-                        "date": "status_date",
-                    },
-                },
-                {
-                    "query_url": "https://data.lacity.org/resource/gwh9-jnip.json",
-                    "fields": {
-                        "permit_number": "permit_nbr",
-                        "status": "status_desc",
-                        "address": ["primary_address"],
-                        "description": "work_desc",
-                        "date": "status_date",
-                    },
-                },
+                *(
+                    {
+                        "query_url": f"https://data.lacity.org/resource/{dataset_id}.json",
+                        "fields": _LADBS_FIELDS,
+                    }
+                    for dataset_id in (
+                        "pi9x-tg5x",  # building issued
+                        "ysqd-apz7",  # electrical issued
+                        "67is-svtd",  # mechanical issued
+                        "gwh9-jnip",  # building submitted
+                        "9k3p-zrda",  # electrical submitted
+                        "9rag-xmmd",  # mechanical submitted
+                    )
+                ),
                 {
                     "query_url": "https://data.lacity.org/resource/xnhu-aczu.json",
                     "fields": {
