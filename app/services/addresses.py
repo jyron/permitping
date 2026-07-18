@@ -21,11 +21,14 @@ identical schemas (LA) merge into one result.
 """
 
 import asyncio
+import logging
 import re
 import time
 from datetime import datetime, timezone
 
 import httpx
+
+logger = logging.getLogger("permitping.addresses")
 
 from app.registry import JURISDICTIONS, get_jurisdiction
 from app.services.adapters.aca import UA
@@ -196,19 +199,22 @@ async def suggest(q: str) -> list[dict]:
             return results
 
     house, street = _parse_query(norm_q)
-    tasks = []
+    tasks, labels = [], []
     for jurisdiction, entry in _searchable():
         if not entry.get("suggest", True):
             continue
         fn = (_suggest_socrata if jurisdiction["adapter"] == "socrata"
               else _suggest_arcgis)
         tasks.append(fn(jurisdiction, entry, norm_q, house, street))
+        labels.append(f"{jurisdiction['slug']}#{entry.get('dataset_index', 0)}")
     gathered = await asyncio.gather(*tasks, return_exceptions=True)
 
     seen, results = set(), []
-    for batch in gathered:
+    for label, batch in zip(labels, gathered):
         if isinstance(batch, BaseException):
-            continue  # one slow/broken source never blocks the rest
+            # one slow/broken source never blocks the rest
+            logger.warning("suggest source %s failed: %r", label, batch)
+            continue
         for s in batch:
             key = (s["slug"], s["address"])
             if s["address"] and key not in seen:
@@ -305,6 +311,7 @@ async def permits_at(slug: str, filters: dict) -> dict | None:
     seen, permits = set(), []
     for batch in gathered:
         if isinstance(batch, BaseException):
+            logger.warning("permits_at source for %s failed: %r", slug, batch)
             continue
         for p in batch:
             if p["permit_number"] and p["permit_number"] not in seen:
