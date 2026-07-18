@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__CITY__ Building Permit Status Lookup — Permit Ping</title>
+<meta name="description" content="Enter a __CITY__ permit number to retrieve its current status from the official municipal record. Free, no account required.">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-jurisdiction="__SLUG__">
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="/">Permit<span>Ping</span></a>
+    <nav>
+      <a href="/#pricing">Pricing</a>
+      <a href="/account">My permits</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>__CITY__ Building Permit Status Lookup</h1>
+    <p class="sub">Enter a permit number to retrieve its current status from the official municipal record. No account or email required.</p>
+  </div>
+
+  <div class="card">
+    <form id="lookup-form">
+      <label for="permit-number">Permit number</label>
+      <input id="permit-number" placeholder="__PERMIT_EXAMPLE__" required autocomplete="off">
+      <button type="submit" id="lookup-btn">Check permit status</button>
+    </form>
+    <div id="lookup-error"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <section>
+    <h2>About __CITY_NAME__ permits</h2>
+    <p>Permit numbers in __CITY__ typically look like <b>__PERMIT_EXAMPLE__</b>. Records are retrieved from the official source: <a href="__PORTAL_URL__" rel="nofollow">__PORTAL_NAME__</a>.</p>
+    <p>Common statuses you may see: <b>Application Received</b> (submitted, awaiting intake), <b>Plan Review</b> (city staff reviewing plans), <b>Corrections Required</b> (action needed from the applicant), <b>Approved</b> (permit issued), <b>Inspections</b> (work underway, inspections scheduled), and <b>Finaled</b> (all work approved and closed).</p>
+  </section>
+
+  <section>
+    <h2>Want to know when it changes?</h2>
+    <p>Permit Ping checks the record daily and emails you when the status changes. Free for up to 3 permits — look one up above to start monitoring it.</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">Permit Ping monitors publicly available municipal permit records. Not affiliated with the City of __CITY__.</div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My permits — Permit Ping</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="/">Permit<span>Ping</span></a>
+    <nav>
+      <a href="/#pricing">Pricing</a>
+      <a href="/">Lookup</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>My permits</h1>
+    <p class="sub" id="account-sub"></p>
+  </div>
+
+  <div id="login-section" class="card" style="display:none">
+    <h3 style="margin-top:0">Get your account link</h3>
+    <p class="muted">Enter the email you monitor permits with and we'll send you a sign-in link.</p>
+    <form id="link-form">
+      <label for="link-email">Email address</label>
+      <input id="link-email" type="email" placeholder="permits@company.com" required>
+      <button type="submit">Email me a link</button>
+    </form>
+    <div id="link-msg"></div>
+  </div>
+
+  <div id="account-section" style="display:none">
+    <div class="card">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Permit</th><th>Municipality</th><th>Current status</th><th>Last checked</th><th></th></tr>
+          </thead>
+          <tbody id="monitor-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Add another permit</h3>
+      <form id="add-form">
+        <label for="add-jurisdiction">City or jurisdiction</label>
+        <select id="add-jurisdiction" required></select>
+        <label for="add-permit">Permit number</label>
+        <input id="add-permit" placeholder="BLD-2026-10482" required autocomplete="off">
+        <button type="submit">Add permit</button>
+      </form>
+      <div id="add-msg"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Notification email</h3>
+      <form id="email-form">
+        <label for="new-email">Send alerts to</label>
+        <input id="new-email" type="email" required>
+        <button type="submit" class="secondary">Update email</button>
+      </form>
+      <div id="email-msg"></div>
+    </div>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">Permit Ping monitors publicly available municipal permit records.</div>
+</footer>
+
+<script src="/static/js/account.js"></script>
+</body>
+</html>

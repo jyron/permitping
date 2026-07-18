@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Permit Ping — Know when your permit moves</title>
+<meta name="description" content="Check any supported building permit in seconds, free. Permit Ping monitors the official municipal record daily and emails you when the status changes.">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="/">Permit<span>Ping</span></a>
+    <nav>
+      <a href="#pricing">Pricing</a>
+      <a href="#cities">Cities</a>
+      <a href="/account">My permits</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>Know when your permit moves.</h1>
+    <p class="sub">Check any supported permit in seconds — free. Get an email whenever its official status changes.</p>
+  </div>
+
+  <div class="card">
+    <form id="lookup-form">
+      <label for="location">City or ZIP code</label>
+      <input id="location" placeholder="Mesa or 85201" required autocomplete="off">
+      <label for="permit-number">Permit number</label>
+      <input id="permit-number" placeholder="PMT23-16945" required autocomplete="off">
+      <button type="submit" id="lookup-btn">Check permit status</button>
+    </form>
+    <div id="lookup-error"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <section id="how">
+    <h2>Check it once. Permit Ping watches it from there.</h2>
+    <p>Permit Ping checks the official municipal record every day, keeps a history of the permit's status, and emails you the moment something changes — status, workflow stage, scheduled inspections, inspection results, corrections, and outstanding fees. Availability depends on what the municipality publishes.</p>
+  </section>
+
+  <section id="pricing">
+    <h2>Pricing</h2>
+    <div class="pricing">
+      <div class="card">
+        <h3>Free</h3>
+        <div class="price">$0</div>
+        <p>Unlimited manual lookups<br>3 monitored permits</p>
+      </div>
+      <div class="card">
+        <h3>Standard</h3>
+        <div class="price">$29<small>/month</small></div>
+        <p>Unlimited manual lookups<br>25 monitored permits</p>
+      </div>
+      <div class="card">
+        <h3>Unlimited</h3>
+        <div class="price">$49<small>/month</small></div>
+        <p>Unlimited manual lookups<br>Unlimited monitored permits</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="cities">
+    <h2>Supported cities</h2>
+    <div class="city-links" id="city-links"></div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">Permit Ping monitors publicly available municipal permit records. Not affiliated with any municipality.</div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
