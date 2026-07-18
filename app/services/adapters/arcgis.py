@@ -57,6 +57,9 @@ class ArcGISAdapter(CityAdapter):
 
         attrs = features[0]["attributes"]
         date_raw = attrs.get(fields.get("date", ""), "")
+        details = {"source": source.get("attribution", "official city open data")}
+        if freshness := self._freshness(source["query_url"]):
+            details["freshness"] = freshness
         return PermitRecord(
             permit_number=str(attrs.get(fields["permit_number"], permit_number)),
             jurisdiction=self.jurisdiction["slug"],
@@ -66,5 +69,24 @@ class ArcGISAdapter(CityAdapter):
             description=str(attrs.get(fields.get("description", "")) or ""),
             status_date=_epoch_ms_to_date(date_raw) if source.get("date_is_epoch_ms") else str(date_raw or ""),
             portal_url=self.jurisdiction["portal_url"],
-            details={"source": source.get("attribution", "official city open data")},
+            details=details,
         )
+
+    def _freshness(self, query_url: str) -> str:
+        """Real layer edit time from ArcGIS metadata - never a guess. Not all
+        servers publish editingInfo (Phoenix doesn't); return "" and let the
+        registry fallback stand."""
+        try:
+            resp = httpx.get(
+                query_url.rsplit("/query", 1)[0], params={"f": "json"}, timeout=10
+            )
+            resp.raise_for_status()
+            edited = (resp.json().get("editingInfo") or {}).get("lastEditDate")
+            if edited:
+                day = datetime.fromtimestamp(
+                    edited / 1000, tz=timezone.utc
+                ).strftime("%Y-%m-%d")
+                return f"Official city data feed, source last updated {day}"
+        except (httpx.HTTPError, ValueError):
+            pass
+        return ""

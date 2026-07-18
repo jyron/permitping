@@ -50,7 +50,9 @@ def _fetch_live(db: Session, jurisdiction: dict, permit_number: str) -> PermitRe
         fetched_at=datetime.utcnow(),
     )
     record.details.setdefault("source", "official municipal record")
-    record.details["freshness"] = jurisdiction["freshness"]
+    # adapters that can read the source's real refresh time set freshness
+    # themselves; the registry string is only the static fallback
+    record.details.setdefault("freshness", jurisdiction["freshness"])
     record.details["retrieved_seconds_ago"] = 0
     return record
 

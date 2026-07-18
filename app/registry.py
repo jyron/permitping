@@ -46,7 +46,7 @@ JURISDICTIONS = [
         "portal_name": "Tempe Accela Citizen Access",
         "portal_url": "https://epermits.tempe.gov/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building",
         "permit_example": "BP261596",
-        "freshness": "Official city data feed, refreshed about daily",
+        "freshness": "Official city data feed",
         "adapter": "arcgis",
         "source": {
             "query_url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0/query",
@@ -87,7 +87,7 @@ JURISDICTIONS = [
         "portal_name": "Phoenix PDD Online Permit Search",
         "portal_url": "https://apps-secure.phoenix.gov/PDD/Search/Permits",
         "permit_example": "26008790",
-        "freshness": "Official city feed, refreshed about daily (covers the last ~2 years; newest SHAPE PHX CTR- permits not yet included)",
+        "freshness": "Official city GIS feed (covers roughly the last 2 years; newest SHAPE PHX CTR- permits not yet included)",
         "adapter": "arcgis",
         "source": {
             "query_url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query",
@@ -132,7 +132,7 @@ JURISDICTIONS = [
         "portal_name": "NYC Department of Buildings (DOB NOW / BIS)",
         "portal_url": "https://a810-dobnow.nyc.gov/publish/Index.html",
         "permit_example": "B00354263-I1",
-        "freshness": "Official NYC open data, refreshed about daily",
+        "freshness": "Official NYC open data, updated daily per NYC DOB",
         "adapter": "socrata",
         "source": {
             "attribution": "NYC Open Data (Department of Buildings)",
@@ -170,7 +170,7 @@ JURISDICTIONS = [
         "portal_name": "Chicago Building Permits (city data portal)",
         "portal_url": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu",
         "permit_example": "B200477893",
-        "freshness": "Official city open data, refreshed about daily",
+        "freshness": "Official city open data, updated daily per city data portal",
         "adapter": "socrata",
         "source": {
             "attribution": "Chicago Data Portal (Department of Buildings)",
@@ -198,12 +198,34 @@ JURISDICTIONS = [
         "zip_prefixes": ["900", "901", "913", "914"],
         "portal_name": "LADBS Online Permit Lookup",
         "portal_url": "https://www.ladbs.org/services/check-status/online-permit-lookup",
-        "permit_example": "20010-20000-01442",
-        "freshness": "Official city open data (LADBS), refreshed about weekly",
+        "permit_example": "26016-90000-18307",
+        "freshness": "Official city open data (LADBS)",
         "adapter": "socrata",
         "source": {
             "attribution": "Los Angeles Open Data (LADBS)",
+            # issued first (later lifecycle state wins), then submitted
+            # (in-review permits), then the retired pre-2020 archive
             "datasets": [
+                {
+                    "query_url": "https://data.lacity.org/resource/pi9x-tg5x.json",
+                    "fields": {
+                        "permit_number": "permit_nbr",
+                        "status": "status_desc",
+                        "address": ["primary_address"],
+                        "description": "work_desc",
+                        "date": "status_date",
+                    },
+                },
+                {
+                    "query_url": "https://data.lacity.org/resource/gwh9-jnip.json",
+                    "fields": {
+                        "permit_number": "permit_nbr",
+                        "status": "status_desc",
+                        "address": ["primary_address"],
+                        "description": "work_desc",
+                        "date": "status_date",
+                    },
+                },
                 {
                     "query_url": "https://data.lacity.org/resource/xnhu-aczu.json",
                     "fields": {

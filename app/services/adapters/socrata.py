@@ -12,6 +12,8 @@ source config:
                 resolve to the latest row.
 """
 
+from datetime import datetime, timezone
+
 import httpx
 
 from app.services.adapters.aca import UA
@@ -47,7 +49,7 @@ class SocrataAdapter(CityAdapter):
                 last_error = exc
                 continue
             if rows:
-                return self._record(rows[0], fields, source)
+                return self._record(rows[0], fields, source, dataset["query_url"])
 
         if last_error:
             raise AdapterUnavailable(
@@ -55,11 +57,33 @@ class SocrataAdapter(CityAdapter):
             )
         raise PermitNotFound(permit_number)
 
-    def _record(self, row: dict, fields: dict, source: dict) -> PermitRecord:
+    def _freshness(self, query_url: str) -> str:
+        """Real refresh time from the dataset's own metadata - never a guess."""
+        try:
+            resp = httpx.get(
+                query_url.replace("/resource/", "/api/views/"),
+                headers={"User-Agent": UA},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            updated = resp.json().get("rowsUpdatedAt")
+            if updated:
+                day = datetime.fromtimestamp(updated, tz=timezone.utc).strftime("%Y-%m-%d")
+                return f"Official open data, source last updated {day}"
+        except (httpx.HTTPError, ValueError):
+            pass
+        return ""
+
+    def _record(
+        self, row: dict, fields: dict, source: dict, query_url: str
+    ) -> PermitRecord:
         address_cols = fields.get("address") or []
         address = " ".join(
             part for c in address_cols if (part := str(row.get(c) or "").strip())
         )
+        details = {"source": source.get("attribution", "official city open data")}
+        if freshness := self._freshness(query_url):
+            details["freshness"] = freshness
         return PermitRecord(
             permit_number=str(row.get(fields["permit_number"], "")),
             jurisdiction=self.jurisdiction["slug"],
@@ -69,5 +93,5 @@ class SocrataAdapter(CityAdapter):
             description=str(row.get(fields.get("description", "")) or ""),
             status_date=str(row.get(fields.get("date", "")) or "")[:10],
             portal_url=self.jurisdiction["portal_url"],
-            details={"source": source.get("attribution", "official city open data")},
+            details=details,
         )
