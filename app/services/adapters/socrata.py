@@ -14,6 +14,7 @@ source config:
 
 import httpx
 
+from app.services.adapters.aca import UA
 from app.services.adapters.base import (
     AdapterUnavailable,
     CityAdapter,
@@ -34,7 +35,12 @@ class SocrataAdapter(CityAdapter):
             if fields.get("date"):
                 params["$order"] = f"{fields['date']} DESC"
             try:
-                resp = httpx.get(dataset["query_url"], params=params, timeout=20)
+                resp = httpx.get(
+                    dataset["query_url"],
+                    params=params,
+                    headers={"User-Agent": UA},
+                    timeout=20,
+                )
                 resp.raise_for_status()
                 rows = resp.json()
             except (httpx.HTTPError, ValueError) as exc:
