@@ -28,10 +28,13 @@ from datetime import datetime, timezone
 
 import httpx
 
-logger = logging.getLogger("permitping.addresses")
-
+from app.db import repo
+from app.db.database import SessionLocal
 from app.registry import JURISDICTIONS, get_jurisdiction
 from app.services.adapters.aca import UA
+from app.services.adapters.socrata import socrata_headers
+
+logger = logging.getLogger("permitping.addresses")
 
 SUGGEST_MIN_CHARS = 4
 SUGGEST_LIMIT = 8
@@ -107,25 +110,28 @@ def _format_date(value, epoch_ms: bool = False) -> str:
     return str(value)[:10]
 
 
-async def _fetch_json(url: str, params: dict):
-    resp = await _get_client().get(url, params=params)
+async def _fetch_json(url: str, params: dict, headers: dict | None = None):
+    resp = await _get_client().get(url, params=params, headers=headers)
     resp.raise_for_status()
     return resp.json()
 
 
 # ---------------------------------------------------------------- suggest
 
-# Socrata portals sit behind a WAF that 403s SQL-looking $where clauses when
-# the caller is a datacenter IP (Railway) — the same query passes from a
-# residential connection. Precise $where is attempted first; on a 403 the
-# domain is remembered and queried with the WAF-safe $q full-text parameter
-# instead, with the precision recovered by filtering rows in Python.
+# Socrata portals throttle anonymous datacenter traffic hard: first the WAF
+# 403s SQL-looking $where clauses, and under sustained anonymous load the IP
+# gets blocked outright (a SOCRATA_APP_TOKEN largely prevents this). Precise
+# $where is attempted first; on a 403 the domain is remembered and queried
+# with the $q full-text parameter instead; if even $q 403s, the domain is
+# hard-blocked for a while — the local permit store still serves suggestions.
 _blocked_domains: dict[str, float] = {}
+_hard_blocked: dict[str, float] = {}
 _BLOCKED_TTL = 3600
 
 
-def _domain_blocked(url: str) -> bool:
-    ts = _blocked_domains.get(httpx.URL(url).host)
+def _domain_blocked(url: str, registry: dict | None = None) -> bool:
+    registry = _blocked_domains if registry is None else registry
+    ts = registry.get(httpx.URL(url).host)
     return ts is not None and time.monotonic() - ts < _BLOCKED_TTL
 
 
@@ -136,6 +142,9 @@ async def _suggest_socrata(jurisdiction, entry, norm_q, house, street):
     if fields.get("date"):
         base["$order"] = f"{fields['date']} DESC"
     cols = _entry_columns(jurisdiction, entry)
+
+    if _domain_blocked(dataset["query_url"], _hard_blocked):
+        return []  # fully banned for now; the store source still answers
 
     if not _domain_blocked(dataset["query_url"]):
         params = dict(base)
@@ -157,7 +166,7 @@ async def _suggest_socrata(jurisdiction, entry, norm_q, house, street):
             if house and entry.get("house"):
                 params[entry["house"]] = house
         try:
-            rows = await _fetch_json(dataset["query_url"], params)
+            rows = await _fetch_json(dataset["query_url"], params, socrata_headers())
             return [_row_suggestion(jurisdiction, entry, row, cols) for row in rows]
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != 403:
@@ -176,7 +185,15 @@ async def _suggest_socrata(jurisdiction, entry, norm_q, house, street):
         params = dict(base, **{"$q": " ".join(q_tokens)})
         if house and entry.get("house"):
             params[entry["house"]] = house
-        rows = await _fetch_json(dataset["query_url"], params)
+        try:
+            rows = await _fetch_json(dataset["query_url"], params, socrata_headers())
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 403:
+                raise
+            host = httpx.URL(dataset["query_url"]).host
+            _hard_blocked[host] = time.monotonic()
+            logger.warning("even $q 403s from %s — hard-blocking live queries", host)
+            return []
         suggestions = [_row_suggestion(jurisdiction, entry, r, cols) for r in rows]
         return [
             s for s in suggestions
@@ -185,7 +202,7 @@ async def _suggest_socrata(jurisdiction, entry, norm_q, house, street):
         ]
 
     results = await q_attempt(tokens)
-    if not results and len(tokens) > 1:
+    if not results and len(tokens) > 1 and not _domain_blocked(dataset["query_url"], _hard_blocked):
         results = await q_attempt(tokens[:-1])
     return results
 
@@ -239,6 +256,37 @@ def _row_suggestion(jurisdiction, entry, row, cols):
     }
 
 
+def _store_suggestions_sync(city_slug, house, street):
+    """Suggestions from our own permit store — instant, and the only source
+    that still answers when the live portals are throttling us."""
+    slugs = [
+        j["slug"] for j in JURISDICTIONS
+        if j.get("address_search") and (not city_slug or j["slug"] == city_slug)
+    ]
+    if not slugs:
+        return []
+    db = SessionLocal()
+    try:
+        pairs = repo.address_suggestions_from_store(
+            db, slugs, house, street, SUGGEST_LIMIT * 2
+        )
+    finally:
+        db.close()
+    results = []
+    for slug, address in pairs:
+        jurisdiction = get_jurisdiction(slug)
+        address = _normalize(address)
+        results.append({
+            "address": address,
+            "label": f"{address} — {jurisdiction['city']}, {jurisdiction['state']}",
+            "slug": slug,
+            "city": jurisdiction["city"],
+            "state": jurisdiction["state"],
+            "filters": {},
+        })
+    return results
+
+
 async def suggest(q: str, city_slug: str | None = None) -> list[dict]:
     norm_q = _normalize(q)
     if len(norm_q) < SUGGEST_MIN_CHARS:
@@ -260,6 +308,9 @@ async def suggest(q: str, city_slug: str | None = None) -> list[dict]:
               else _suggest_arcgis)
         tasks.append(fn(jurisdiction, entry, norm_q, house, street))
         labels.append(f"{jurisdiction['slug']}#{entry.get('dataset_index', 0)}")
+    # the store source runs last so live results win deduplication
+    tasks.append(asyncio.to_thread(_store_suggestions_sync, city_slug, house, street))
+    labels.append("store")
     gathered = await asyncio.gather(*tasks, return_exceptions=True)
 
     seen, results = set(), []
@@ -325,7 +376,7 @@ async def _permits_socrata(jurisdiction, entry, filters):
     params = {**filters, "$limit": str(PERMITS_LIMIT)}
     if fields.get("date"):
         params["$order"] = f"{fields['date']} DESC"
-    rows = await _fetch_json(dataset["query_url"], params)
+    rows = await _fetch_json(dataset["query_url"], params, socrata_headers())
     cols = _entry_columns(jurisdiction, entry)
     return [
         {

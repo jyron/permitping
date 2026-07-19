@@ -68,6 +68,44 @@ def known_addresses(db: Session, limit: int) -> list[tuple[str, str]]:
     )
 
 
+def _address_match_query(base, house: str | None, street_tokens: list[str]):
+    if house:
+        base = base.where(func.upper(Permit.address).like(f"{house} %"))
+    for token in street_tokens:
+        base = base.where(func.upper(Permit.address).like(f"%{token.upper()}%"))
+    return base
+
+
+def address_suggestions_from_store(
+    db: Session, slugs: list[str], house: str | None,
+    street_tokens: list[str], limit: int,
+) -> list[tuple[str, str]]:
+    """Distinct (jurisdiction, address) pairs already in the permit store that
+    match the typed pieces — the offline complement to the live sources."""
+    if not house and not street_tokens:
+        return []
+    query = (
+        select(Permit.jurisdiction, Permit.address)
+        .distinct()
+        .where(Permit.jurisdiction.in_(slugs), Permit.address != "")
+        .limit(limit)
+    )
+    return list(db.execute(_address_match_query(query, house, street_tokens)))
+
+
+def permits_matching_address(
+    db: Session, jurisdiction: str, house: str | None,
+    street_tokens: list[str], limit: int,
+) -> list[Permit]:
+    query = (
+        select(Permit)
+        .where(Permit.jurisdiction == jurisdiction, Permit.address != "")
+        .order_by(Permit.status_date.desc())
+        .limit(limit)
+    )
+    return list(db.scalars(_address_match_query(query, house, street_tokens)))
+
+
 def get_account_by_email(db: Session, email: str) -> Account | None:
     return db.scalar(select(Account).where(Account.email == email))
 

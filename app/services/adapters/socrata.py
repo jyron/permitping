@@ -16,7 +16,15 @@ from datetime import datetime, timezone
 
 import httpx
 
+from app import config
 from app.services.adapters.aca import UA
+
+
+def socrata_headers() -> dict:
+    headers = {"User-Agent": UA}
+    if config.SOCRATA_APP_TOKEN:
+        headers["X-App-Token"] = config.SOCRATA_APP_TOKEN
+    return headers
 from app.services.adapters.base import (
     AdapterUnavailable,
     CityAdapter,
@@ -40,7 +48,7 @@ class SocrataAdapter(CityAdapter):
                 resp = httpx.get(
                     dataset["query_url"],
                     params=params,
-                    headers={"User-Agent": UA},
+                    headers=socrata_headers(),
                     timeout=20,
                 )
                 resp.raise_for_status()
@@ -62,7 +70,7 @@ class SocrataAdapter(CityAdapter):
         try:
             resp = httpx.get(
                 query_url.replace("/resource/", "/api/views/"),
-                headers={"User-Agent": UA},
+                headers=socrata_headers(),
                 timeout=10,
             )
             resp.raise_for_status()

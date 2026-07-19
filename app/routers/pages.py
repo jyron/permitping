@@ -197,8 +197,31 @@ async def address_page(slug: str, addr_slug: str, db: Session = Depends(get_db))
             "Address pages aren't available for that city yet.", "/", "See supported cities"
         )
     suggestion = await resolve_address_slug(slug, addr_slug)
-    data = await permits_at(slug, suggestion["filters"]) if suggestion else None
-    permits = data["permits"] if data else []
+    permits = []
+    if suggestion and suggestion["filters"]:
+        data = await permits_at(slug, suggestion["filters"])
+        permits = data["permits"] if data else []
+    if not permits:
+        # live sources unavailable (or a store-derived suggestion): serve the
+        # page from our own permit store
+        tokens = [t for t in addr_slug.split("-") if t]
+        house = tokens[0] if tokens and tokens[0].isdigit() else None
+        street = [t for t in (tokens[1:] if house else tokens) if len(t) >= 2]
+        target = "".join(re.findall(r"[a-z0-9]+", addr_slug))
+        rows_from_store = repo.permits_matching_address(db, slug, house, street, 100)
+        permits = [
+            {
+                "permit_number": r.permit_number,
+                "status": r.status,
+                "description": r.description,
+                "date": r.status_date,
+                "address": r.address.upper(),
+            }
+            for r in rows_from_store
+            if "".join(re.findall(r"[a-z0-9]+", r.address.lower())) == target
+        ][:25]
+        if permits and not suggestion:
+            suggestion = {"address": permits[0]["address"]}
 
     # feed what we just rendered into the permit store: it seeds the sitemap
     # (permit + address pages) and makes the linked permit pages instant

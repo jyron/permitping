@@ -14,7 +14,11 @@ from app import config
 from app.db import repo
 from app.db.models import Permit
 from app.registry import get_adapter, get_jurisdiction
-from app.services.adapters.base import PermitNotFound, PermitRecord
+from app.services.adapters.base import (
+    AdapterUnavailable,
+    PermitNotFound,
+    PermitRecord,
+)
 
 
 def _record_from_row(row: Permit, jurisdiction: dict) -> PermitRecord:
@@ -79,4 +83,10 @@ def lookup_permit(
         ttl = timedelta(seconds=config.LOOKUP_CACHE_SECONDS)
         if datetime.utcnow() - row.fetched_at < ttl:
             return _record_from_row(row, jurisdiction)
-    return _fetch_live(db, jurisdiction, permit_number)
+    try:
+        return _fetch_live(db, jurisdiction, permit_number)
+    except AdapterUnavailable:
+        # a stale answer beats an error page when the source is throttling us
+        if row:
+            return _record_from_row(row, jurisdiction)
+        raise
