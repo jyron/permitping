@@ -5,3 +5,4 @@ python-dotenv
 email-validator
 httpx
 psycopg2-binary
+posthog

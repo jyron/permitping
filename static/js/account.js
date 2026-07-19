@@ -1,6 +1,12 @@
 const token = new URLSearchParams(location.search).get("t");
 const $ = (id) => document.getElementById(id);
 
+// analytics: window.ph is defined (possibly as a no-op) by /static/js/ph.js
+const ph = (event, props) => window.ph && window.ph(event, props);
+const failReason = (status) =>
+  ({ 402: "plan_limit", 404: "not_found", 409: "already_monitored" }[status] || "error");
+let accountViewed = false;
+
 function esc(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
@@ -34,7 +40,11 @@ async function api(path, options = {}) {
   });
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Something went wrong. Try again.");
+  if (!res.ok) {
+    const err = new Error(data.detail || "Something went wrong. Try again.");
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -50,6 +60,7 @@ function showLogin() {
         body: JSON.stringify({ email: $("link-email").value }),
       });
       const data = await res.json();
+      ph("login_link_requested", {});
       $("link-msg").innerHTML = `<div class="notice ok">${esc(data.message)}</div>`;
     } catch {
       $("link-msg").innerHTML = `<div class="notice error">Could not send the link. Try again.</div>`;
@@ -83,6 +94,14 @@ function monitorRow(m) {
 
 async function loadAccount() {
   const account = await api("/api/account");
+  if (!accountViewed) {
+    accountViewed = true;
+    window.phIdentify && window.phIdentify(account.email);
+    ph("account_viewed", {
+      plan: account.plan,
+      active_monitors: account.active_monitors,
+    });
+  }
   $("account-section").style.display = "";
   const limit = account.monitor_limit === null ? "unlimited" : account.monitor_limit;
   $("account-sub").textContent =
@@ -112,14 +131,17 @@ $("monitor-rows")?.addEventListener("click", async (e) => {
   try {
     if (action === "pause" || action === "resume") {
       await api(`/api/monitors/${id}/${action}`, { method: "POST" });
+      ph(action === "pause" ? "monitor_paused" : "monitor_resumed", {});
       await loadAccount();
     } else if (action === "delete") {
       await api(`/api/monitors/${id}`, { method: "DELETE" });
+      ph("monitor_removed", {});
       await loadAccount();
     } else if (action === "history") {
       const slot = row.querySelector(".history-slot");
       if (slot.innerHTML) { slot.innerHTML = ""; btn.disabled = false; return; }
       const events = await api(`/api/monitors/${id}/events`);
+      ph("history_viewed", { events: events.length });
       slot.innerHTML = events.length
         ? `<ul class="history">${events
             .map((ev) => `<li>${new Date(ev.changed_at).toLocaleString()}: ${esc(ev.previous_status || "(start)")} → <b>${esc(ev.new_status)}</b></li>`)
@@ -128,6 +150,7 @@ $("monitor-rows")?.addEventListener("click", async (e) => {
       btn.disabled = false;
     }
   } catch (err) {
+    ph("monitor_action_failed", { action, reason: failReason(err.status) });
     alert(err.message);
     btn.disabled = false;
   }
@@ -144,10 +167,16 @@ $("add-form")?.addEventListener("submit", async (e) => {
         permit_number: $("add-permit").value,
       }),
     });
+    ph("monitor_created", { city: $("add-jurisdiction").value, source: "account" });
     $("add-permit").value = "";
     $("add-msg").innerHTML = `<div class="notice ok">Permit added.</div>`;
     await loadAccount();
   } catch (err) {
+    ph("monitor_create_failed", {
+      city: $("add-jurisdiction").value,
+      reason: failReason(err.status),
+      source: "account",
+    });
     $("add-msg").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
   }
 });
@@ -160,6 +189,7 @@ $("email-form")?.addEventListener("submit", async (e) => {
       method: "POST",
       body: JSON.stringify({ email: $("new-email").value }),
     });
+    ph("email_updated", {});
     $("email-msg").innerHTML = `<div class="notice ok">Email updated.</div>`;
     await loadAccount();
   } catch (err) {

@@ -10,6 +10,11 @@ source config:
                 column names joined with spaces; description/date optional.
                 date also drives "$order ... DESC" so renewals/sequences
                 resolve to the latest row.
+    sync      - False to exclude the dataset from the nightly bulk sync
+                (app.sync.feeds) while keeping it as a lookup fallback
+    sync_limit - per-dataset row cap for that sync (default in feeds.py)
+    sync_order - column the sync's newest-first window orders by, when the
+                 date field itself doesn't sort (e.g. MM/DD/YYYY text)
 """
 
 from datetime import datetime, timezone

@@ -1,17 +1,19 @@
 """Daily cycle: sync feed datasets, then check every active monitor.
 
-Feed-city monitors read the freshly synced store (zero per-permit HTTP).
-Portal-city monitors make one live lookup each.
+Feed-city monitors read the freshly synced store (zero per-permit HTTP);
+a monitored permit the last sync didn't touch (outside a windowed Socrata
+sync) gets one live lookup instead, or its status would freeze. Portal-city
+monitors make one live lookup each.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app import config
 from app.db import repo
 from app.db.database import SessionLocal
 from app.registry import get_jurisdiction
-from app.services import emailer, lookup
+from app.services import analytics, emailer, lookup
 from app.services.adapters.base import AdapterUnavailable, PermitNotFound
 from app.sync import feeds
 
@@ -25,15 +27,23 @@ def run_all_checks() -> dict:
             if not jurisdiction:
                 continue
             now = datetime.utcnow()
+            row = repo.get_permit(db, monitor.jurisdiction, monitor.permit_number)
+            stale = not row or now - row.fetched_at > timedelta(
+                seconds=config.CHECK_INTERVAL_SECONDS
+            )
             try:
                 record = lookup.lookup_permit(
                     db,
                     monitor.jurisdiction,
                     monitor.permit_number,
-                    force_live=jurisdiction["source_class"] == "portal",
+                    force_live=jurisdiction["source_class"] == "portal" or stale,
                 )
-            except (PermitNotFound, AdapterUnavailable):
+            except (PermitNotFound, AdapterUnavailable) as exc:
                 errors += 1
+                analytics.capture("monitor_check_failed", {
+                    "city": monitor.jurisdiction,
+                    "reason": type(exc).__name__,
+                })
                 continue
             checked += 1
             if record.status != monitor.current_status:
@@ -42,6 +52,7 @@ def run_all_checks() -> dict:
                 emailer.send_status_change(
                     monitor.account.email, monitor, previous, record.status, now
                 )
+                analytics.capture("alert_email_sent", {"city": monitor.jurisdiction})
                 changed += 1
             else:
                 repo.touch_monitor(db, monitor, now)

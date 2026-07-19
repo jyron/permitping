@@ -198,3 +198,12 @@ footer.site { border-top: 1px solid var(--border); margin-top: 48px; padding: 24
 .permit-link { font-weight: 600; text-decoration: none; }
 h1.permit-number { font-size: 1.6rem; margin: 0 0 12px; word-break: break-all; }
 .omnibox-card .combo input { margin-bottom: 4px; }
+
+/* City pages */
+.city-stats { color: var(--muted); margin: -16px 0 28px; }
+.city-stats b { color: var(--text); }
+.status-defs { margin: 0; }
+.status-defs dt { font-weight: 600; margin-top: 14px; }
+.status-defs dd { margin: 2px 0 0; color: var(--muted); }
+.faq-q { font-size: 1.05rem; margin: 22px 0 6px; }
+.faq-a { margin: 0; color: var(--muted); }

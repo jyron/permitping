@@ -144,7 +144,7 @@ JURISDICTIONS = [
         "state": "NY",
         "aliases": ["nyc", "new york city", "manhattan", "brooklyn", "queens",
                     "bronx", "the bronx", "staten island"],
-        "source_class": "portal",
+        "source_class": "feed",
         "zip_prefixes": ["100", "101", "102", "103", "104", "111", "112",
                          "113", "114", "116"],
         "portal_name": "NYC Department of Buildings (DOB NOW / BIS)",
@@ -171,6 +171,9 @@ JURISDICTIONS = [
                 },
                 {
                     "query_url": "https://data.cityofnewyork.us/resource/ipu4-2q9a.json",
+                    # issuance_date is MM/DD/YYYY text and sorts wrong; the DOB
+                    # export timestamp is the real "recently touched" order
+                    "sync_order": "dobrundate",
                     "fields": {
                         "permit_number": "job__",
                         "status": "permit_status",
@@ -188,7 +191,7 @@ JURISDICTIONS = [
         "name": "Chicago, Illinois",
         "city": "Chicago",
         "state": "IL",
-        "source_class": "portal",
+        "source_class": "feed",
         "zip_prefixes": ["606"],
         "portal_name": "Chicago Building Permits (city data portal)",
         "portal_url": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu",
@@ -221,7 +224,7 @@ JURISDICTIONS = [
         "city": "Los Angeles",
         "state": "CA",
         "aliases": ["la"],
-        "source_class": "portal",
+        "source_class": "feed",
         "zip_prefixes": ["900", "901", "913", "914"],
         "portal_name": "LADBS Online Permit Lookup",
         "portal_url": "https://www.ladbs.org/services/check-status/online-permit-lookup",
@@ -258,6 +261,7 @@ JURISDICTIONS = [
                 ),
                 {
                     "query_url": "https://data.lacity.org/resource/xnhu-aczu.json",
+                    "sync": False,  # retired archive: lookup fallback only
                     "fields": {
                         "permit_number": "pcis_permit",
                         "status": "latest_status",

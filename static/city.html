@@ -13,6 +13,9 @@
 <meta property="og:url" content="__CANONICAL__">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="/static/css/style.css">
+__JSONLD__
+<script>window.PH_CONFIG={key:"__POSTHOG_KEY__",host:"__POSTHOG_HOST__"};</script>
+<script src="/static/js/ph.js"></script>
 </head>
 <body data-jurisdiction="__SLUG__">
 <header class="site">
@@ -29,6 +32,7 @@
   <div class="hero">
     <h1>__CITY__ Building Permit Status Lookup</h1>
     <p class="sub">Type an address to see every __CITY__ permit on file for it, or a permit number to get its current status from the official municipal record. No account required.</p>
+    __STATS_BLOCK__
   </div>
 
   <div class="card omnibox-card">
@@ -43,8 +47,33 @@
   <section>
     <h2>About __CITY_NAME__ permits</h2>
     <p>Permit numbers in __CITY__ typically look like <b>__PERMIT_EXAMPLE__</b>. Records are retrieved from the official source: <a href="__PORTAL_URL__" rel="nofollow">__PORTAL_NAME__</a>.</p>
-    <p>Common statuses you may see: <b>Application Received</b> (submitted, awaiting intake), <b>Plan Review</b> (city staff reviewing plans), <b>Corrections Required</b> (action needed from the applicant), <b>Approved</b> (permit issued), <b>Inspections</b> (work underway, inspections scheduled), and <b>Finaled</b> (all work approved and closed).</p>
   </section>
+
+  __RECENT_BLOCK__
+
+  __ADDRESSES_BLOCK__
+
+  <section>
+    <h2>What __CITY__ permit statuses mean</h2>
+    <dl class="status-defs">
+      <dt>Application Received / Submitted</dt>
+      <dd>The application has been filed and is waiting for intake review. Nothing is approved yet, and work may not begin.</dd>
+      <dt>In Review / Plan Review</dt>
+      <dd>City staff are checking the plans against building codes and zoning rules. Most permits spend the bulk of their timeline in this stage.</dd>
+      <dt>Corrections Required</dt>
+      <dd>Reviewers found issues the applicant has to fix and resubmit. The review clock pauses until corrected plans come back to the city.</dd>
+      <dt>Issued / Approved</dt>
+      <dd>The permit has been granted and work may legally begin, subject to the required inspections along the way.</dd>
+      <dt>Inspections</dt>
+      <dd>Work is underway and city inspectors are signing off stage by stage — foundation, framing, electrical, and so on.</dd>
+      <dt>Finaled / Closed</dt>
+      <dd>Every inspection passed and the permit is complete. If you're buying or refinancing a property, this is the status you want to see.</dd>
+      <dt>Expired / Revoked</dt>
+      <dd>The permit lapsed before the work finished, or the city withdrew it. Work done under an expired permit usually needs a new permit to legalize.</dd>
+    </dl>
+  </section>
+
+  __FAQ_SECTION__
 
   <section>
     <h2>Want to know when it changes?</h2>

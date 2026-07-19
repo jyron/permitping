@@ -36,33 +36,103 @@ def replace_city_permits(db: Session, jurisdiction: str, rows: list[dict]) -> in
     return len(rows)
 
 
+def upsert_city_permits(db: Session, jurisdiction: str, rows: list[dict]) -> int:
+    """Windowed sync: replace the fetched rows in place and leave everything
+    outside the window (live write-through permits) untouched."""
+    for start in range(0, len(rows), 500):
+        chunk = rows[start:start + 500]
+        db.query(Permit).filter(
+            Permit.jurisdiction == jurisdiction,
+            Permit.permit_number.in_([r["permit_number"] for r in chunk]),
+        ).delete(synchronize_session=False)
+        db.bulk_insert_mappings(
+            Permit, [{"jurisdiction": jurisdiction, **r} for r in chunk]
+        )
+    db.commit()
+    return len(rows)
+
+
 def count_city_permits(db: Session, jurisdiction: str) -> int:
     return db.scalar(
         select(func.count(Permit.id)).where(Permit.jurisdiction == jurisdiction)
     )
 
 
-def recent_permit_pages(db: Session, limit: int) -> list[tuple[str, str]]:
-    """(jurisdiction, permit_number) of the most recently seen permits —
-    the permit detail pages worth listing in the sitemap."""
+# status_date is free text from portals; only ISO dates sort and count sanely
+_ISO_DATE = "____-__-__"
+
+
+def city_permit_pages(db: Session, jurisdiction: str, limit: int) -> list[tuple[str, datetime]]:
+    """(permit_number, fetched_at) for the city's permit sitemap, newest first."""
     return list(
         db.execute(
-            select(Permit.jurisdiction, Permit.permit_number)
-            .order_by(Permit.fetched_at.desc())
+            select(Permit.permit_number, Permit.fetched_at)
+            .where(Permit.jurisdiction == jurisdiction)
+            .order_by(Permit.fetched_at.desc(), Permit.status_date.desc())
             .limit(limit)
         )
     )
 
 
-def known_addresses(db: Session, limit: int) -> list[tuple[str, str]]:
-    """Distinct (jurisdiction, address) pairs that have at least one permit —
-    the only address pages that belong in the sitemap."""
+def city_address_pages(db: Session, jurisdiction: str, limit: int) -> list[tuple[str, datetime]]:
+    """(address, last fetched_at) of every address with a permit on file —
+    the only address pages that belong in the city's sitemap."""
     return list(
         db.execute(
-            select(Permit.jurisdiction, Permit.address)
-            .where(Permit.address != "")
-            .group_by(Permit.jurisdiction, Permit.address)
+            select(Permit.address, func.max(Permit.fetched_at))
+            .where(Permit.jurisdiction == jurisdiction, Permit.address != "")
+            .group_by(Permit.address)
             .order_by(func.max(Permit.fetched_at).desc())
+            .limit(limit)
+        )
+    )
+
+
+def city_stats(db: Session, jurisdiction: str, year: int) -> dict:
+    total = db.scalar(
+        select(func.count(Permit.id)).where(Permit.jurisdiction == jurisdiction)
+    )
+    year_count = db.scalar(
+        select(func.count(Permit.id)).where(
+            Permit.jurisdiction == jurisdiction,
+            Permit.status_date.like(f"{year}-%"),
+        )
+    )
+    latest = db.scalar(
+        select(func.max(Permit.status_date)).where(
+            Permit.jurisdiction == jurisdiction,
+            Permit.status_date.like(_ISO_DATE),
+        )
+    )
+    return {"total": total or 0, "year": year_count or 0, "latest": latest or ""}
+
+
+def recent_city_permits(db: Session, jurisdiction: str, limit: int) -> list[Permit]:
+    return list(
+        db.scalars(
+            select(Permit)
+            .where(
+                Permit.jurisdiction == jurisdiction,
+                Permit.status_date.like(_ISO_DATE),
+            )
+            .order_by(Permit.status_date.desc())
+            .limit(limit)
+        )
+    )
+
+
+def active_city_addresses(db: Session, jurisdiction: str, limit: int) -> list[tuple[str, int, str]]:
+    """(address, permit count, latest ISO status date), most recently active first."""
+    return list(
+        db.execute(
+            select(Permit.address, func.count(Permit.id), func.max(Permit.status_date))
+            .where(
+                Permit.jurisdiction == jurisdiction,
+                Permit.address != "",
+                Permit.status_date.like(_ISO_DATE),
+            )
+            .group_by(Permit.address)
+            .order_by(func.max(Permit.status_date).desc())
             .limit(limit)
         )
     )
@@ -81,13 +151,15 @@ def address_suggestions_from_store(
     street_tokens: list[str], limit: int,
 ) -> list[tuple[str, str]]:
     """Distinct (jurisdiction, address) pairs already in the permit store that
-    match the typed pieces — the offline complement to the live sources."""
+    match the typed pieces, most recently active first — without the ORDER BY
+    the DB returns an arbitrary (and unstable) subset."""
     if not house and not street_tokens:
         return []
     query = (
         select(Permit.jurisdiction, Permit.address)
-        .distinct()
         .where(Permit.jurisdiction.in_(slugs), Permit.address != "")
+        .group_by(Permit.jurisdiction, Permit.address)
+        .order_by(func.max(Permit.status_date).desc())
         .limit(limit)
     )
     return list(db.execute(_address_match_query(query, house, street_tokens)))

@@ -23,6 +23,11 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 # Socrata portals aggressively throttle/ban datacenter IPs
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
 
+# PostHog project API key (phc_...) — empty disables analytics entirely,
+# client and server side
+POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY", "")
+POSTHOG_HOST = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
+
 ACCELA_APP_ID = os.getenv("ACCELA_APP_ID", "")
 ACCELA_APP_SECRET = os.getenv("ACCELA_APP_SECRET", "")
 

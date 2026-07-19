@@ -9,6 +9,11 @@
 const scopeSlug = document.body.dataset.jurisdiction || null;
 const $ = (id) => document.getElementById(id);
 
+// analytics: window.ph is defined (possibly as a no-op) by /static/js/ph.js
+const ph = (event, props) => window.ph && window.ph(event, props);
+const failReason = (status) =>
+  ({ 402: "plan_limit", 404: "not_found", 409: "already_monitored" }[status] || "error");
+
 function esc(str) {
   const div = document.createElement("div");
   div.textContent = str ?? "";
@@ -21,7 +26,11 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Something went wrong. Try again.");
+  if (!res.ok) {
+    const err = new Error(data.detail || "Something went wrong. Try again.");
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -61,6 +70,8 @@ function initOmnibox() {
   let timer = null;
   let controller = null;
   let requestSeq = 0;
+  let searchTimer = null;
+  let unavailableHintSent = false;
 
   jurisdictionsReady.then(() => {
     const scope = JURISDICTIONS.find((j) => j.slug === scopeSlug);
@@ -110,6 +121,11 @@ function initOmnibox() {
 
   const choose = (row) => {
     if (!row || !row.href) return;
+    ph("suggestion_selected", {
+      type: row.type,
+      city: row.href.split("/")[1],
+      scope: scopeSlug,
+    });
     close();
     window.location = row.href;
   };
@@ -154,8 +170,24 @@ function initOmnibox() {
         type: "hint",
         html: `${esc(scope.city)} address search isn't available yet — permit numbers look like <b>${esc(scope.permit_example)}</b>`,
       });
+      if (!unavailableHintSent) {
+        unavailableHintSent = true;
+        ph("address_search_unavailable", { city: scopeSlug });
+      }
     }
     render();
+
+    // one search_performed per typing pause; rows reflects whatever the
+    // async address fetch has rendered by then
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      ph("search_performed", {
+        scope: scopeSlug,
+        kind: /^\d{5}$/.test(text) ? "zip" : addressish(text) ? "address" : "permit",
+        query_len: text.length,
+        results: rows.filter((r) => r.href).length,
+      });
+    }, 1000);
 
     if (!addressish(text) || !canSearchAddresses || text.length < 4) return;
     const seq = ++requestSeq;
@@ -185,7 +217,7 @@ function initOmnibox() {
       } catch (err) {
         if (err.name !== "AbortError") close();
       }
-    }, 250);
+    }, 150);
   });
 
   input.addEventListener("keydown", (e) => {
@@ -222,6 +254,7 @@ function initMonitorForm() {
     const btn = $("monitor-btn");
     btn.disabled = true;
     $("monitor-msg").innerHTML = "";
+    ph("monitor_submit", { city: scopeSlug, permit_number: permitNumber });
     try {
       await api("/api/monitors", {
         method: "POST",
@@ -231,10 +264,21 @@ function initMonitorForm() {
           email: $("monitor-email").value,
         }),
       });
+      window.phIdentify && window.phIdentify($("monitor-email").value);
+      ph("monitor_created", {
+        city: scopeSlug,
+        permit_number: permitNumber,
+        source: "permit_page",
+      });
       $("monitor-msg").innerHTML =
         `<div class="notice ok">Monitoring started. Check your email for a link to manage your permits.</div>`;
       form.style.display = "none";
     } catch (err) {
+      ph("monitor_create_failed", {
+        city: scopeSlug,
+        reason: failReason(err.status),
+        source: "permit_page",
+      });
       $("monitor-msg").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
       btn.disabled = false;
     }

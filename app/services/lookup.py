@@ -1,7 +1,9 @@
 """Permit lookup: canonical store first, live source only when needed.
 
-- feed cities: the store is the synced dataset — read it; a miss falls back
-  to one live feed query (covers the window before the first sync lands).
+- feed cities: the store is the synced dataset — read it; a miss or a forced
+  check falls back to one live query (covers the window before the first
+  sync lands, and permits outside a windowed Socrata sync), with the stored
+  row as the answer of last resort.
 - portal cities: the store acts as a short-lived cache (LOOKUP_CACHE_SECONDS);
   stale or missing -> live portal lookup, written back to the store.
 """
@@ -74,9 +76,14 @@ def lookup_permit(
     row = repo.get_permit(db, slug, permit_number)
 
     if jurisdiction["source_class"] == "feed":
-        if row:
+        if row and not force_live:
             return _record_from_row(row, jurisdiction)
-        return _fetch_live(db, jurisdiction, permit_number)
+        try:
+            return _fetch_live(db, jurisdiction, permit_number)
+        except AdapterUnavailable:
+            if row:
+                return _record_from_row(row, jurisdiction)
+            raise
 
     # portal city: store row is a cache with a TTL
     if row and not force_live:

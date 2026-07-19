@@ -1,5 +1,9 @@
-"""Address autocomplete and permits-at-address, backed by the cities' own
-permit datasets — every suggestion is an address that actually has permits.
+"""Address autocomplete and permits-at-address — every suggestion is an
+address that actually has permits. Suggestions come from the local permit
+store first (every address-search city is feed-synced, so one SQL query
+answers instantly); the cities' live APIs are the fallback for addresses the
+store doesn't know, and the source of the per-dataset filters used to list
+permits at a chosen address.
 
 Jurisdictions opt in via an "address_search" list in the registry. Each entry
 describes how to search one dataset:
@@ -287,6 +291,42 @@ def _store_suggestions_sync(city_slug, house, street):
     return results
 
 
+LIVE_SUGGEST_TIMEOUT = 3.0
+
+
+async def _live_suggestions(
+    city_slug: str | None, norm_q: str, house: str | None, street: list[str]
+) -> list[dict]:
+    """Fan out to the cities' live APIs — the fallback when the store has no
+    match (cold start, or an address outside the synced window). Sources that
+    haven't answered within LIVE_SUGGEST_TIMEOUT are dropped, not awaited."""
+    tasks = []
+    for jurisdiction, entry in _searchable():
+        if not entry.get("suggest", True):
+            continue
+        if city_slug and jurisdiction["slug"] != city_slug:
+            continue
+        fn = (_suggest_socrata if jurisdiction["adapter"] == "socrata"
+              else _suggest_arcgis)
+        label = f"{jurisdiction['slug']}#{entry.get('dataset_index', 0)}"
+        tasks.append((label, asyncio.create_task(
+            fn(jurisdiction, entry, norm_q, house, street))))
+    if not tasks:
+        return []
+    await asyncio.wait([t for _, t in tasks], timeout=LIVE_SUGGEST_TIMEOUT)
+
+    results = []
+    for label, task in tasks:
+        if not task.done():
+            task.cancel()
+            logger.warning("suggest source %s dropped after %.1fs", label, LIVE_SUGGEST_TIMEOUT)
+        elif exc := task.exception():
+            logger.warning("suggest source %s failed: %r", label, exc)
+        else:
+            results.extend(task.result())
+    return results
+
+
 async def suggest(q: str, city_slug: str | None = None) -> list[dict]:
     norm_q = _normalize(q)
     if len(norm_q) < SUGGEST_MIN_CHARS:
@@ -298,34 +338,22 @@ async def suggest(q: str, city_slug: str | None = None) -> list[dict]:
             return results
 
     house, street = _parse_query(norm_q)
-    tasks, labels = [], []
-    for jurisdiction, entry in _searchable():
-        if not entry.get("suggest", True):
-            continue
-        if city_slug and jurisdiction["slug"] != city_slug:
-            continue
-        fn = (_suggest_socrata if jurisdiction["adapter"] == "socrata"
-              else _suggest_arcgis)
-        tasks.append(fn(jurisdiction, entry, norm_q, house, street))
-        labels.append(f"{jurisdiction['slug']}#{entry.get('dataset_index', 0)}")
-    # the store source runs last so live results win deduplication
-    tasks.append(asyncio.to_thread(_store_suggestions_sync, city_slug, house, street))
-    labels.append("store")
-    gathered = await asyncio.gather(*tasks, return_exceptions=True)
+    # store first: every address-search city is feed-synced, so one local SQL
+    # query answers instantly and consistently; live sources are only worth
+    # their latency (and WAF roulette) when the store has nothing at all
+    raw = await asyncio.to_thread(_store_suggestions_sync, city_slug, house, street)
+    if not raw:
+        raw = await _live_suggestions(city_slug, norm_q, house, street)
 
     seen, results = set(), []
-    for label, batch in zip(labels, gathered):
-        if isinstance(batch, BaseException):
-            # one slow/broken source never blocks the rest
-            logger.warning("suggest source %s failed: %r", label, batch)
-            continue
-        for s in batch:
-            key = (s["slug"], s["address"])
-            if s["address"] and key not in seen:
-                seen.add(key)
-                results.append(s)
-    # addresses that literally start with what was typed rank first
-    results.sort(key=lambda s: (not s["address"].startswith(norm_q), s["address"]))
+    for s in raw:
+        key = (s["slug"], s["address"])
+        if s["address"] and key not in seen:
+            seen.add(key)
+            results.append(s)
+    # addresses that literally start with what was typed rank first; the sort
+    # is stable, so recency order from the store survives within each group
+    results.sort(key=lambda s: not s["address"].startswith(norm_q))
     results = results[:SUGGEST_LIMIT]
 
     # empty results are usually a source timing out, not a real "no match" —

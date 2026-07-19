@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app import config
 from app.db.database import init_db
 from app.routers import account, addresses, admin, lookup, pages
+from app.services import analytics
 from app.services.checker import scheduler_loop
 
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(scheduler_loop())
     yield
     task.cancel()
+    analytics.shutdown()
 
 
 app = FastAPI(title=config.APP_NAME, lifespan=lifespan)
