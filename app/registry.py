@@ -29,6 +29,7 @@ _LADBS_FIELDS = {
 JURISDICTIONS = [
     {
         "slug": "mesa-az",
+        "permit_pattern": r"^[A-Z]{2,4}\d{2}-\d{3,6}$",
         "name": "Mesa, Arizona",
         "city": "Mesa",
         "state": "AZ",
@@ -48,6 +49,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "tempe-az",
+        "permit_pattern": r"^[A-Z]{1,4}\d{5,8}$",
         "name": "Tempe, Arizona",
         "city": "Tempe",
         "state": "AZ",
@@ -73,6 +75,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "chandler-az",
+        "permit_pattern": r"^[A-Z]{2,4}\d{2}-\d{3,6}$",
         "name": "Chandler, Arizona",
         "city": "Chandler",
         "state": "AZ",
@@ -90,6 +93,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "phoenix-az",
+        "permit_pattern": r"^\d{7,9}$",
         "name": "Phoenix, Arizona",
         "city": "Phoenix",
         "state": "AZ",
@@ -116,6 +120,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "goodyear-az",
+        "permit_pattern": r"^[A-Z]\d{2}-\d{4,6}$",
         "name": "Goodyear, Arizona",
         "city": "Goodyear",
         "state": "AZ",
@@ -133,6 +138,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "new-york-ny",
+        "permit_pattern": r"^([A-Z]\d{8,9}(-[A-Z]\d{1,2})?|\d{9})$",
         "name": "New York City, New York",
         "city": "New York",
         "state": "NY",
@@ -178,6 +184,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "chicago-il",
+        "permit_pattern": r"^(B\d{9}|\d{8,9})$",
         "name": "Chicago, Illinois",
         "city": "Chicago",
         "state": "IL",
@@ -209,6 +216,7 @@ JURISDICTIONS = [
     },
     {
         "slug": "los-angeles-ca",
+        "permit_pattern": r"^\d{5}-\d{5}-\d{5}$",
         "name": "Los Angeles, California",
         "city": "Los Angeles",
         "state": "CA",

@@ -32,34 +32,17 @@
 <main class="wrap">
   <div class="hero">
     <h1>Check any building permit's status.</h1>
-    <p class="sub">Type a street address and see every permit on file for it — or look one up by permit number. Straight from the official city record, free.</p>
+    <p class="sub">One box: type a street address to see every permit on file for it, or type a permit number to jump straight to its status. Straight from the official city record, free.</p>
   </div>
 
-  <div class="card">
-    <label for="address-input">Street address</label>
+  <div class="card omnibox-card">
+    <label for="omnibox-input">Address or permit number</label>
     <div class="combo">
-      <input id="address-input" placeholder="Start typing an address — e.g. 1060 W Addison" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="address-suggestions" aria-autocomplete="list">
-      <ul id="address-suggestions" role="listbox" hidden></ul>
+      <input id="omnibox-input" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="omnibox-list" aria-autocomplete="list">
+      <ul id="omnibox-list" role="listbox" hidden></ul>
     </div>
-    <p class="muted combo-hint" id="address-hint">Address search covers Chicago, New York, Los Angeles, Phoenix, and Tempe so far — more cities on the way.</p>
-    <div id="address-error"></div>
+    <p class="muted combo-hint" id="omnibox-hint"></p>
   </div>
-
-  <div id="address-permits"></div>
-
-  <div class="card">
-    <h3 class="alt-lookup">Know the permit number?</h3>
-    <form id="lookup-form">
-      <label for="location">City or ZIP code</label>
-      <input id="location" placeholder="Mesa or 85201" required autocomplete="off">
-      <label for="permit-number">Permit number</label>
-      <input id="permit-number" placeholder="PMT23-16945" required autocomplete="off">
-      <button type="submit" id="lookup-btn">Check permit status</button>
-    </form>
-    <div id="lookup-error"></div>
-  </div>
-
-  <div id="result"></div>
 
   <section id="how">
     <h2>Check it once. Permit Ping watches it from there.</h2>

@@ -21,8 +21,13 @@ class LookupRequest(BaseModel):
 @router.get("/jurisdictions")
 def jurisdictions():
     return [
-        {k: j[k] for k in ("slug", "name", "city", "state", "portal_name",
-                           "portal_url", "permit_example")}
+        {
+            **{k: j[k] for k in ("slug", "name", "city", "state", "portal_name",
+                                 "portal_url", "permit_example", "permit_pattern")},
+            "address_search": bool(j.get("address_search")),
+            "zips": j.get("zips", []),
+            "zip_prefixes": j.get("zip_prefixes", []),
+        }
         for j in JURISDICTIONS
     ]
 

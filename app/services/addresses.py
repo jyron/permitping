@@ -239,11 +239,12 @@ def _row_suggestion(jurisdiction, entry, row, cols):
     }
 
 
-async def suggest(q: str) -> list[dict]:
+async def suggest(q: str, city_slug: str | None = None) -> list[dict]:
     norm_q = _normalize(q)
     if len(norm_q) < SUGGEST_MIN_CHARS:
         return []
-    if cached := _cache.get(norm_q):
+    cache_key = f"{city_slug or '*'}|{norm_q}"
+    if cached := _cache.get(cache_key):
         ts, results = cached
         if time.monotonic() - ts < _CACHE_TTL:
             return results
@@ -252,6 +253,8 @@ async def suggest(q: str) -> list[dict]:
     tasks, labels = [], []
     for jurisdiction, entry in _searchable():
         if not entry.get("suggest", True):
+            continue
+        if city_slug and jurisdiction["slug"] != city_slug:
             continue
         fn = (_suggest_socrata if jurisdiction["adapter"] == "socrata"
               else _suggest_arcgis)
@@ -279,11 +282,42 @@ async def suggest(q: str) -> list[dict]:
     if results:
         if len(_cache) >= _CACHE_MAX:
             _cache.clear()
-        _cache[norm_q] = (time.monotonic(), results)
+        _cache[cache_key] = (time.monotonic(), results)
     return results
 
 
+# -------------------------------------------------------- address page urls
+
+def slugify_address(address: str) -> str:
+    """URL slug for an address page: alnum runs joined by dashes."""
+    return "-".join(re.findall(r"[a-z0-9]+", address.lower()))
+
+
+def _alnum(text: str) -> str:
+    return "".join(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+async def resolve_address_slug(city_slug: str, addr_slug: str) -> dict | None:
+    """Map an address-page slug back to a live suggestion (address text +
+    filters) by re-running the scoped suggest pipeline and matching on the
+    alnum-normalized form (slugs drop characters like '#')."""
+    text = " ".join(addr_slug.split("-"))
+    suggestions = await suggest(text, city_slug=city_slug)
+    target = _alnum(text)
+    for s in suggestions:
+        if _alnum(s["address"]) == target:
+            return s
+    return None
+
+
 # ---------------------------------------------------- permits at an address
+
+# address pages are crawlable, so results are cached briefly in-process to
+# keep bots from hammering the city APIs
+_permits_cache: dict[str, tuple[float, dict]] = {}
+_PERMITS_CACHE_TTL = 6 * 3600
+_PERMITS_CACHE_MAX = 2000
+
 
 async def _permits_socrata(jurisdiction, entry, filters):
     dataset = _entry_dataset(jurisdiction, entry)
@@ -348,6 +382,12 @@ async def permits_at(slug: str, filters: dict) -> dict | None:
     if not filters or len(filters) > 8:
         return None
 
+    cache_key = f"{slug}|{sorted(filters.items())}"
+    if cached := _permits_cache.get(cache_key):
+        ts, result = cached
+        if time.monotonic() - ts < _PERMITS_CACHE_TTL:
+            return result
+
     tasks = []
     for entry in jurisdiction["address_search"]:
         if set(filters) <= set(_entry_columns(jurisdiction, entry)):
@@ -368,7 +408,7 @@ async def permits_at(slug: str, filters: dict) -> dict | None:
                 seen.add(p["permit_number"])
                 permits.append(p)
     permits.sort(key=lambda p: p["date"] or "0000", reverse=True)
-    return {
+    result = {
         "jurisdiction": {
             "slug": jurisdiction["slug"],
             "name": jurisdiction["name"],
@@ -377,3 +417,8 @@ async def permits_at(slug: str, filters: dict) -> dict | None:
         },
         "permits": permits[:PERMITS_LIMIT],
     }
+    if permits:
+        if len(_permits_cache) >= _PERMITS_CACHE_MAX:
+            _permits_cache.clear()
+        _permits_cache[cache_key] = (time.monotonic(), result)
+    return result

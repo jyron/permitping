@@ -42,6 +42,32 @@ def count_city_permits(db: Session, jurisdiction: str) -> int:
     )
 
 
+def recent_permit_pages(db: Session, limit: int) -> list[tuple[str, str]]:
+    """(jurisdiction, permit_number) of the most recently seen permits —
+    the permit detail pages worth listing in the sitemap."""
+    return list(
+        db.execute(
+            select(Permit.jurisdiction, Permit.permit_number)
+            .order_by(Permit.fetched_at.desc())
+            .limit(limit)
+        )
+    )
+
+
+def known_addresses(db: Session, limit: int) -> list[tuple[str, str]]:
+    """Distinct (jurisdiction, address) pairs that have at least one permit —
+    the only address pages that belong in the sitemap."""
+    return list(
+        db.execute(
+            select(Permit.jurisdiction, Permit.address)
+            .where(Permit.address != "")
+            .group_by(Permit.jurisdiction, Permit.address)
+            .order_by(func.max(Permit.fetched_at).desc())
+            .limit(limit)
+        )
+    )
+
+
 def get_account_by_email(db: Session, email: str) -> Account | None:
     return db.scalar(select(Account).where(Account.email == email))
 

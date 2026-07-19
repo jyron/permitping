@@ -28,19 +28,17 @@
 <main class="wrap">
   <div class="hero">
     <h1>__CITY__ Building Permit Status Lookup</h1>
-    <p class="sub">Enter a permit number to retrieve its current status from the official municipal record. No account or email required.</p>
+    <p class="sub">Type an address to see every __CITY__ permit on file for it, or a permit number to get its current status from the official municipal record. No account required.</p>
   </div>
 
-  <div class="card">
-    <form id="lookup-form">
-      <label for="permit-number">Permit number</label>
-      <input id="permit-number" placeholder="__PERMIT_EXAMPLE__" required autocomplete="off">
-      <button type="submit" id="lookup-btn">Check permit status</button>
-    </form>
-    <div id="lookup-error"></div>
+  <div class="card omnibox-card">
+    <label for="omnibox-input">__CITY__ address or permit number</label>
+    <div class="combo">
+      <input id="omnibox-input" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="omnibox-list" aria-autocomplete="list">
+      <ul id="omnibox-list" role="listbox" hidden></ul>
+    </div>
+    <p class="muted combo-hint" id="omnibox-hint"></p>
   </div>
-
-  <div id="result"></div>
 
   <section>
     <h2>About __CITY_NAME__ permits</h2>

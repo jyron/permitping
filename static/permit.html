@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Permit __PERMIT_NUMBER__ Status — __CITY_NAME__ | Permit Ping</title>
+<meta name="description" content="Current status of building permit __PERMIT_NUMBER__ in __CITY__: __STATUS__. Retrieved from the official municipal record. Free status monitoring by email.">
+<link rel="canonical" href="__CANONICAL__">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Permit Ping">
+<meta property="og:title" content="Permit __PERMIT_NUMBER__ — __STATUS__">
+<meta property="og:description" content="Current status of __CITY__ building permit __PERMIT_NUMBER__, from the official municipal record.">
+<meta property="og:url" content="__CANONICAL__">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-jurisdiction="__SLUG__" data-permit="__PERMIT_NUMBER__">
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="/">Permit<span>Ping</span></a>
+    <nav>
+      <a href="/__SLUG__">__CITY__ permits</a>
+      <a href="/account">My permits</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="crumbs"><a href="/">All cities</a> › <a href="/__SLUG__">__CITY_NAME__</a> › __PERMIT_NUMBER__</nav>
+
+  <div class="card">
+    <p class="muted" style="margin-top:0">__CITY_NAME__ building permit</p>
+    <h1 class="permit-number">__PERMIT_NUMBER__</h1>
+    <span class="status-badge __STATUS_CLASS__">__STATUS__</span>
+    __ADDRESS_BLOCK__
+    <p class="result-meta">__DESCRIPTION__</p>
+    <div class="detail-grid">
+      <div><b>Status date</b>__STATUS_DATE__</div>
+      <div><b>Jurisdiction</b>__CITY_NAME__</div>
+      <div><b>Source</b>__SOURCE__</div>
+      <div><b>Data freshness</b>__FRESHNESS__</div>
+    </div>
+    <a class="btn secondary" href="__PORTAL_URL__" rel="nofollow">View official record at __PORTAL_NAME__</a>
+  </div>
+
+  <div class="card upsell">
+    <h3>Know the moment this permit moves.</h3>
+    <p>Permit Ping checks this record daily and emails you when its status changes — reviews clear, corrections come back, inspections pass. Free for up to 3 permits.</p>
+    <form id="monitor-form">
+      <label for="monitor-email">Email address</label>
+      <input id="monitor-email" type="email" placeholder="permits@company.com" required>
+      <button type="submit" id="monitor-btn">Monitor this permit</button>
+    </form>
+    <div id="monitor-msg"></div>
+  </div>
+
+  <div class="card omnibox-card">
+    <label for="omnibox-input">Look up another address or permit</label>
+    <div class="combo">
+      <input id="omnibox-input" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="omnibox-list" aria-autocomplete="list">
+      <ul id="omnibox-list" role="listbox" hidden></ul>
+    </div>
+    <p class="muted combo-hint" id="omnibox-hint"></p>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">Permit Ping monitors publicly available municipal permit records. Not affiliated with any municipality.</div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

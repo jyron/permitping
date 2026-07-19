@@ -12,8 +12,9 @@ class PermitsAtRequest(BaseModel):
 
 
 @router.get("/suggest")
-async def suggest(q: str = Query("", max_length=120)):
-    return await addresses.suggest(q)
+async def suggest(q: str = Query("", max_length=120),
+                  city: str = Query("", max_length=50)):
+    return await addresses.suggest(q, city_slug=city or None)
 
 
 @router.post("/permits")

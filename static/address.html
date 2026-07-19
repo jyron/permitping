@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Permits at __ADDRESS__ — __CITY__, __STATE__ | Permit Ping</title>
+<meta name="description" content="Every building permit on file at __ADDRESS__ in __CITY__, __STATE__ — current statuses straight from the official municipal record, free.">
+<link rel="canonical" href="__CANONICAL__">__ROBOTS__
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Permit Ping">
+<meta property="og:title" content="Permits at __ADDRESS__ — __CITY__, __STATE__">
+<meta property="og:description" content="Every building permit on file at this address, with current statuses from the official record.">
+<meta property="og:url" content="__CANONICAL__">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-jurisdiction="__SLUG__">
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="/">Permit<span>Ping</span></a>
+    <nav>
+      <a href="/__SLUG__">__CITY__ permits</a>
+      <a href="/account">My permits</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="crumbs"><a href="/">All cities</a> › <a href="/__SLUG__">__CITY_NAME__</a> › __ADDRESS__</nav>
+
+  <div class="hero compact">
+    <h1>Permits at __ADDRESS__</h1>
+    <p class="sub">__COUNT_TEXT__ · __CITY__, __STATE__ · from the official municipal record</p>
+  </div>
+
+  <div class="card">
+    __ROWS__
+  </div>
+
+  <div class="card omnibox-card">
+    <label for="omnibox-input">Look up another address or permit</label>
+    <div class="combo">
+      <input id="omnibox-input" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="omnibox-list" aria-autocomplete="list">
+      <ul id="omnibox-list" role="listbox" hidden></ul>
+    </div>
+    <p class="muted combo-hint" id="omnibox-hint"></p>
+  </div>
+
+  <section>
+    <h2>Monitoring a permit at this address?</h2>
+    <p>Open any permit above and Permit Ping will watch it for you — a daily check of the official record with an email the moment the status changes. Free for up to 3 permits.</p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">Permit Ping monitors publicly available municipal permit records. Not affiliated with any municipality.</div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -187,3 +187,14 @@ footer.site { border-top: 1px solid var(--border); margin-top: 48px; padding: 24
 .permit-row-main { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .permit-row .result-meta { margin: 0 0 10px; }
 .permit-row .btn { padding: 8px 14px; font-size: .9rem; }
+
+/* Omnibox rows + detail pages */
+.crumbs { font-size: .85rem; color: var(--muted); margin: 20px 0 0; }
+.crumbs a { color: var(--muted); }
+.hero.compact { padding: 28px 0 20px; }
+.hero.compact h1 { font-size: 1.5rem; }
+.combo li.row-hint { color: var(--muted); font-size: .9rem; cursor: default; }
+.combo li.row-hint:hover { background: transparent; color: var(--muted); }
+.permit-link { font-weight: 600; text-decoration: none; }
+h1.permit-number { font-size: 1.6rem; margin: 0 0 12px; word-break: break-all; }
+.omnibox-card .combo input { margin-bottom: 4px; }

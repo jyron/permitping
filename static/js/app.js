@@ -1,17 +1,13 @@
-// Shared by the landing page and city pages: lookup + monitor signup.
-// City pages pin the jurisdiction via <body data-jurisdiction>; the landing
-// page sends whatever the visitor typed (city name or ZIP).
+// One omnibox, every page. The page sets the scope (<body data-jurisdiction>
+// pins it to a city); the dropdown does all disambiguation — address
+// suggestions, permit-number candidates, ZIP -> city, and capability hints.
+// Selecting anything navigates to a real URL:
+//   /{city}                      city page
+//   /{city}/address/{addr-slug}  every permit at an address
+//   /{city}/permit/{number}      one permit's status
 
-const fixedJurisdiction = document.body.dataset.jurisdiction || null;
+const scopeSlug = document.body.dataset.jurisdiction || null;
 const $ = (id) => document.getElementById(id);
-
-function statusClass(status) {
-  const s = (status || "").toLowerCase();
-  if (/(approved|finaled|final|issued|passed|complete|done)/.test(s)) return "status-green";
-  if (/(correction|denied|hold|expired|action|failed|revoked)/.test(s)) return "status-red";
-  if (/(review|received|pending|inspection|submitted|applied)/.test(s)) return "status-amber";
-  return "";
-}
 
 function esc(str) {
   const div = document.createElement("div");
@@ -29,142 +25,161 @@ async function api(path, options = {}) {
   return data;
 }
 
-async function loadCityLinks() {
-  const links = $("city-links");
-  if (!links) return;
-  const list = await api("/api/jurisdictions");
-  links.innerHTML = list
-    .map((j) => `<a href="/${j.slug}">${esc(j.city)}, ${esc(j.state)}</a>`)
-    .join("");
+// mirror of slugify_address() in app/services/addresses.py
+function slugifyAddress(address) {
+  return (address.toLowerCase().match(/[a-z0-9]+/g) || []).join("-");
 }
 
-function renderResult(record) {
-  const d = record.details || {};
-  const retrieved = d.retrieved_seconds_ago ?? 0;
-  const retrievedText =
-    retrieved < 5 ? "just now"
-    : retrieved < 120 ? `${retrieved} seconds ago`
-    : `${Math.round(retrieved / 60)} minutes ago`;
-  $("result").innerHTML = `
-    <div class="card">
-      <p class="muted" style="margin-top:0">Permit found: ${esc(record.jurisdiction_name)}</p>
-      <p class="permit-number">${esc(record.permit_number)}</p>
-      <p class="result-meta">${esc(record.address)}<br>${esc(record.description)}</p>
-      <span class="status-badge ${statusClass(record.status)}">${esc(record.status)}</span>
-      <div class="detail-grid">
-        <div><b>Status date</b>${esc(record.status_date || "n/a")}</div>
-        <div><b>Jurisdiction</b>${esc(record.jurisdiction_name)}</div>
-        <div><b>Source</b>${esc(d.source || "official municipal record")}</div>
-        <div><b>Data freshness</b>${esc(d.freshness || "n/a")}</div>
-      </div>
-      <a class="btn secondary" href="${esc(record.portal_url)}" rel="nofollow">View official record</a>
-      <p class="retrieved">Retrieved from the official source ${retrievedText}.</p>
-    </div>
-    <div class="card upsell">
-      <h3>Want to know when this changes?</h3>
-      <p>Permit Ping will check this record daily and email you when its status changes. Free for up to 3 permits.</p>
-      <form id="monitor-form">
-        <label for="monitor-email">Email address</label>
-        <input id="monitor-email" type="email" placeholder="permits@company.com" required>
-        <button type="submit" id="monitor-btn">Monitor this permit</button>
-      </form>
-      <div id="monitor-msg"></div>
-    </div>`;
+let JURISDICTIONS = [];
+const jurisdictionsReady = api("/api/jurisdictions").then((list) => {
+  JURISDICTIONS = list;
+  return list;
+});
 
-  $("monitor-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const btn = $("monitor-btn");
-    btn.disabled = true;
-    $("monitor-msg").innerHTML = "";
-    try {
-      await api("/api/monitors", {
-        method: "POST",
-        body: JSON.stringify({
-          jurisdiction: record.jurisdiction,
-          permit_number: record.permit_number,
-          email: $("monitor-email").value,
-        }),
-      });
-      $("monitor-msg").innerHTML =
-        `<div class="notice ok">Monitoring started. Check your email for a link to manage your permits.</div>`;
-      $("monitor-form").style.display = "none";
-    } catch (err) {
-      $("monitor-msg").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
-      btn.disabled = false;
-    }
-  });
+function cityForZip(zip) {
+  return JURISDICTIONS.find(
+    (j) => j.zips.includes(zip) || j.zip_prefixes.some((p) => zip.startsWith(p))
+  );
 }
 
-// ---- Address autocomplete (landing page only) ----------------------------
-// Suggestions come from the cities' own permit datasets, so every suggestion
-// is an address that actually has permits on file.
-function initAddressSearch() {
-  const input = $("address-input");
+function permitCandidates(text) {
+  const ordered = scopeSlug
+    ? [...JURISDICTIONS].sort((a, b) => (b.slug === scopeSlug) - (a.slug === scopeSlug))
+    : JURISDICTIONS;
+  return ordered.filter((j) => new RegExp(j.permit_pattern).test(text)).slice(0, 3);
+}
+
+// ---- Omnibox ---------------------------------------------------------------
+
+function initOmnibox() {
+  const input = $("omnibox-input");
   if (!input) return;
-  const list = $("address-suggestions");
-  let items = [];
+  const list = $("omnibox-list");
+  const hint = $("omnibox-hint");
+  let rows = [];
   let active = -1;
   let timer = null;
   let controller = null;
+  let requestSeq = 0;
+
+  jurisdictionsReady.then(() => {
+    const scope = JURISDICTIONS.find((j) => j.slug === scopeSlug);
+    const addressCities = JURISDICTIONS.filter((j) => j.address_search);
+    if (!scope) {
+      input.placeholder = "1060 W Addison St — or a permit number";
+      hint.textContent =
+        `Address search: ${addressCities.map((j) => j.city).join(", ")} · ` +
+        "permit numbers work for every supported city.";
+    } else if (scope.address_search) {
+      input.placeholder = `Address in ${scope.city} — or a permit number like ${scope.permit_example}`;
+      hint.textContent = `Searches ${scope.city} addresses and permit numbers.`;
+    } else {
+      input.placeholder = `Permit number, e.g. ${scope.permit_example}`;
+      hint.textContent =
+        `${scope.city} address search isn't available yet — ` +
+        `look up by permit number (they look like ${scope.permit_example}).`;
+    }
+  });
 
   const close = () => {
     list.hidden = true;
     list.innerHTML = "";
-    items = [];
+    rows = [];
     active = -1;
     input.setAttribute("aria-expanded", "false");
   };
 
   const render = () => {
-    if (!items.length) return close();
-    list.innerHTML = items
-      .map(
-        (s, i) =>
-          `<li role="option" id="addr-opt-${i}" ${i === active ? 'class="active" aria-selected="true"' : ""}>
-             ${esc(s.address)} <span class="suggestion-city">${esc(s.city)}, ${esc(s.state)}</span></li>`
-      )
+    if (!rows.length) return close();
+    list.innerHTML = rows
+      .map((r, i) => {
+        const cls = [r.type === "hint" ? "row-hint" : "", i === active ? "active" : ""]
+          .filter(Boolean).join(" ");
+        return `<li role="option" ${cls ? `class="${cls}"` : ""} ${i === active ? 'aria-selected="true"' : ""}>${r.html}</li>`;
+      })
       .join("");
     list.hidden = false;
     input.setAttribute("aria-expanded", "true");
     [...list.children].forEach((li, i) => {
       li.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        select(items[i]);
+        choose(rows[i]);
       });
     });
   };
 
-  async function select(s) {
-    input.value = s.address;
+  const choose = (row) => {
+    if (!row || !row.href) return;
     close();
-    $("address-error").innerHTML = "";
-    $("address-permits").innerHTML =
-      `<div class="card"><p class="muted" style="margin:0">Looking up permits at ${esc(s.address)}…</p></div>`;
-    try {
-      const data = await api("/api/addresses/permits", {
-        method: "POST",
-        body: JSON.stringify({ slug: s.slug, filters: s.filters }),
+    window.location = row.href;
+  };
+
+  const buildStaticRows = (text) => {
+    const built = [];
+    const upper = text.toUpperCase();
+    const zipCity = /^\d{5}$/.test(text) ? cityForZip(text) : null;
+    if (zipCity) {
+      built.push({
+        type: "city",
+        href: `/${zipCity.slug}`,
+        html: `${esc(text)} is ${esc(zipCity.city)}, ${esc(zipCity.state)} <span class="suggestion-city">open city search</span>`,
       });
-      renderAddressPermits(s, data);
-    } catch (err) {
-      $("address-permits").innerHTML = "";
-      $("address-error").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
     }
-  }
+    if (/^[A-Z0-9][A-Z0-9-]{3,}$/.test(upper) && /\d/.test(upper) && !/\s/.test(text)) {
+      for (const j of permitCandidates(upper)) {
+        built.push({
+          type: "permit",
+          href: `/${j.slug}/permit/${encodeURIComponent(upper)}`,
+          html: `Look up permit <b>${esc(upper)}</b> <span class="suggestion-city">${esc(j.city)}, ${esc(j.state)}</span>`,
+        });
+      }
+    }
+    return built;
+  };
+
+  const addressish = (text) =>
+    /\s/.test(text.trim()) || /^\d+$/.test(text.trim());
 
   input.addEventListener("input", () => {
     clearTimeout(timer);
-    const q = input.value.trim();
-    if (q.length < 4) return close();
+    const text = input.value.trim();
+    if (text.length < 2) return close();
+
+    rows = buildStaticRows(text);
+    const scope = JURISDICTIONS.find((j) => j.slug === scopeSlug);
+    const canSearchAddresses = scope ? scope.address_search : true;
+
+    if (addressish(text) && !canSearchAddresses && scope) {
+      rows.push({
+        type: "hint",
+        html: `${esc(scope.city)} address search isn't available yet — permit numbers look like <b>${esc(scope.permit_example)}</b>`,
+      });
+    }
+    render();
+
+    if (!addressish(text) || !canSearchAddresses || text.length < 4) return;
+    const seq = ++requestSeq;
     timer = setTimeout(async () => {
       controller?.abort();
       controller = new AbortController();
       try {
-        const res = await fetch(`/api/addresses/suggest?q=${encodeURIComponent(q)}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) return;
-        items = await res.json();
+        const url = `/api/addresses/suggest?q=${encodeURIComponent(text)}` +
+          (scopeSlug ? `&city=${encodeURIComponent(scopeSlug)}` : "");
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok || seq !== requestSeq) return;
+        const suggestions = await res.json();
+        const addressRows = suggestions.map((s) => ({
+          type: "address",
+          href: `/${s.slug}/address/${slugifyAddress(s.address)}`,
+          html: `${esc(s.address)} <span class="suggestion-city">${esc(s.city)}, ${esc(s.state)}</span>`,
+        }));
+        if (!addressRows.length && !rows.some((r) => r.type !== "hint")) {
+          addressRows.push({
+            type: "hint",
+            html: "No matching addresses in supported cities yet — keep typing, or try a permit number.",
+          });
+        }
+        rows = [...addressRows, ...rows.filter((r) => r.type !== "hint" || addressRows.length === 0)];
         active = -1;
         render();
       } catch (err) {
@@ -175,17 +190,19 @@ function initAddressSearch() {
 
   input.addEventListener("keydown", (e) => {
     if (list.hidden) return;
-    if (e.key === "ArrowDown") {
+    const selectable = rows.map((r, i) => (r.href ? i : -1)).filter((i) => i >= 0);
+    if (!selectable.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      active = (active + 1) % items.length;
-      render();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      active = (active - 1 + items.length) % items.length;
+      const pos = selectable.indexOf(active);
+      const next = e.key === "ArrowDown"
+        ? selectable[(pos + 1) % selectable.length]
+        : selectable[(pos - 1 + selectable.length) % selectable.length];
+      active = next;
       render();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      select(items[active >= 0 ? active : 0]);
+      choose(rows[active >= 0 ? active : selectable[0]]);
     } else if (e.key === "Escape") {
       close();
     }
@@ -194,78 +211,47 @@ function initAddressSearch() {
   input.addEventListener("blur", () => setTimeout(close, 150));
 }
 
-function renderAddressPermits(s, data) {
-  const j = data.jurisdiction;
-  if (!data.permits.length) {
-    $("address-permits").innerHTML =
-      `<div class="card"><p class="muted" style="margin:0">No permits on file at ${esc(s.address)} in ${esc(j.city)}, ${esc(j.state)}.</p></div>`;
-    return;
-  }
-  const rows = data.permits
-    .map(
-      (p) => `
-      <div class="permit-row">
-        <div class="permit-row-main">
-          <b>${esc(p.permit_number)}</b>
-          <span class="status-badge ${statusClass(p.status)}">${esc(p.status)}</span>
-        </div>
-        <p class="result-meta">${esc(p.description || "")}${p.date ? ` · ${esc(p.date)}` : ""}</p>
-        <button class="btn secondary" data-permit="${esc(p.permit_number)}">Full status &amp; monitoring</button>
-      </div>`
-    )
-    .join("");
-  $("address-permits").innerHTML = `
-    <div class="card">
-      <p class="muted" style="margin-top:0">${data.permits.length} permit${data.permits.length === 1 ? "" : "s"} on file at</p>
-      <p class="permit-number">${esc(s.address)} — ${esc(j.city)}, ${esc(j.state)}</p>
-      ${rows}
-    </div>`;
-  [...document.querySelectorAll("#address-permits [data-permit]")].forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      btn.textContent = "Loading…";
-      try {
-        const record = await api("/api/lookup", {
-          method: "POST",
-          body: JSON.stringify({ location: j.slug, permit_number: btn.dataset.permit }),
-        });
-        renderResult(record);
-        $("result").scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (err) {
-        $("address-error").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Full status & monitoring";
-      }
-    });
+// ---- Permit page: monitor signup ------------------------------------------
+
+function initMonitorForm() {
+  const form = $("monitor-form");
+  const permitNumber = document.body.dataset.permit;
+  if (!form || !permitNumber) return;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("monitor-btn");
+    btn.disabled = true;
+    $("monitor-msg").innerHTML = "";
+    try {
+      await api("/api/monitors", {
+        method: "POST",
+        body: JSON.stringify({
+          jurisdiction: scopeSlug,
+          permit_number: permitNumber,
+          email: $("monitor-email").value,
+        }),
+      });
+      $("monitor-msg").innerHTML =
+        `<div class="notice ok">Monitoring started. Check your email for a link to manage your permits.</div>`;
+      form.style.display = "none";
+    } catch (err) {
+      $("monitor-msg").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
+      btn.disabled = false;
+    }
   });
 }
 
-initAddressSearch();
+// ---- Landing page: city directory -----------------------------------------
 
-$("lookup-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = $("lookup-btn");
-  btn.disabled = true;
-  btn.textContent = "Checking…";
-  $("lookup-error").innerHTML = "";
-  $("result").innerHTML = "";
-  try {
-    const record = await api("/api/lookup", {
-      method: "POST",
-      body: JSON.stringify({
-        location: fixedJurisdiction || $("location").value,
-        permit_number: $("permit-number").value,
-      }),
-    });
-    renderResult(record);
-    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (err) {
-    $("lookup-error").innerHTML = `<div class="notice error">${esc(err.message)}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Check permit status";
-  }
-});
+async function loadCityLinks() {
+  const links = $("city-links");
+  if (!links) return;
+  const list = await jurisdictionsReady;
+  links.innerHTML = list
+    .map((j) => `<a href="/${j.slug}">${esc(j.city)}, ${esc(j.state)}</a>`)
+    .join("");
+}
 
+initOmnibox();
+initMonitorForm();
 loadCityLinks();
